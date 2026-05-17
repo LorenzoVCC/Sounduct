@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sounduct</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="popup">
+    <div class="header">
+      <span class="label">Nuevo track detectado</span>
+      <h1 class="filename" id="filename">Cargando...</h1>
+    </div>
+    <div class="section">
+      <span class="label">Carpeta destino</span>
+      <ul class="folder-list" id="folder-list"></ul>
+    </div>
+    <div class="actions">
+      <button class="btn btn-cancel" onclick="cancelar()">Cancelar</button>
+      <button class="btn btn-confirm" onclick="confirmar()">Confirmar</button>
+    </div>
+  </div>
+
+  <script>
+    var PORT = new URLSearchParams(location.search).get('port')
+    var BASE = 'http://127.0.0.1:' + PORT
+
+    function api(endpoint, method, body) {
+      return fetch(BASE + endpoint, {
+        method:  method || 'GET',
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        body:    body ? JSON.stringify(body) : undefined
+      }).then(function(r) { return r.json() })
+    }
+
+    window.addEventListener('DOMContentLoaded', function() {
+      // Cargar nombre del archivo
+      api('/carpeta/nombre').then(function(res) {
+        document.getElementById('filename').textContent = res.nombre
+      })
+
+      // Cargar lista de carpetas
+      api('/carpeta/carpetas').then(function(res) {
+        var lista = document.getElementById('folder-list')
+        lista.innerHTML = ''
+        res.carpetas.forEach(function(c, i) {
+          var li = document.createElement('li')
+          li.className   = 'folder-item' + (i === 0 ? ' selected' : '')
+          li.textContent = c
+          li.addEventListener('click', function() {
+            document.querySelectorAll('.folder-item').forEach(function(el) {
+              el.classList.remove('selected')
+            })
+            li.classList.add('selected')
+          })
+          li.addEventListener('dblclick', function() {
+            api('/carpeta/confirmar', 'POST', { carpeta: li.textContent.trim() })
+          })
+          lista.appendChild(li)
+        })
+      })
+
+      // Teclado: Enter confirma, Escape cancela, flechas navegan
+      document.addEventListener('keydown', function(e) {
+        var items = Array.from(document.querySelectorAll('.folder-item'))
+        var idx   = items.findIndex(function(i) { return i.classList.contains('selected') })
+        if (e.key === 'ArrowDown') {
+          var n = Math.min(items.length - 1, idx + 1)
+          items.forEach(function(i) { i.classList.remove('selected') })
+          items[n].classList.add('selected')
+          items[n].scrollIntoView({ block: 'nearest' })
+        }
+        if (e.key === 'ArrowUp') {
+          var n = Math.max(0, idx - 1)
+          items.forEach(function(i) { i.classList.remove('selected') })
+          items[n].classList.add('selected')
+          items[n].scrollIntoView({ block: 'nearest' })
+        }
+        if (e.key === 'Enter')  confirmar()
+        if (e.key === 'Escape') cancelar()
+      })
+    })
+
+    function confirmar() {
+      var sel = document.querySelector('.folder-item.selected')
+      if (sel) api('/carpeta/confirmar', 'POST', { carpeta: sel.textContent.trim() })
+    }
+
+    function cancelar() {
+      api('/carpeta/cancelar', 'POST', {})
+    }
+  </script>
+</body>
+</html>

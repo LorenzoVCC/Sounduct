@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sounduct - Settings</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="popup">
+    <div class="header">
+      <span class="label">Configuracion</span>
+      <h1 class="filename">Rutas de Sounduct</h1>
+    </div>
+
+    <div class="settings-body">
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Carpeta de descargas</span>
+          <span class="setting-desc">Donde caen tus descargas (Sounduct la escucha)</span>
+        </div>
+        <div class="setting-input">
+          <span class="setting-path" id="path-descargas">...</span>
+          <button class="btn-ruta" onclick="elegir('descargas', 'Seleccionar carpeta de descargas')">Cambiar</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Biblioteca de musica</span>
+          <span class="setting-desc">Donde se guarda tu musica organizada</span>
+        </div>
+        <div class="setting-input">
+          <span class="setting-path" id="path-biblioteca">...</span>
+          <button class="btn-ruta" onclick="elegir('biblioteca', 'Seleccionar biblioteca de musica')">Cambiar</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Pendrive</span>
+          <span class="setting-desc">Ruta del pendrive (copia exacta de la biblioteca)</span>
+        </div>
+        <div class="setting-input">
+          <span class="setting-path" id="path-pd">...</span>
+          <button class="btn-ruta" onclick="elegir('pd', 'Seleccionar carpeta del pendrive')">Cambiar</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Arranque automatico</span>
+          <span class="setting-desc">Iniciar Sounduct al encender la PC</span>
+        </div>
+        <div class="setting-input">
+          <label class="toggle-label">
+            <input type="checkbox" id="toggle-arranque" />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-cancel" onclick="cancelar()">Cancelar</button>
+      <button class="btn btn-confirm" onclick="guardar()">Guardar</button>
+    </div>
+  </div>
+
+  <script>
+    var PORT  = new URLSearchParams(location.search).get('port')
+    var BASE  = 'http://127.0.0.1:' + PORT
+    var rutas = { descargas: '', biblioteca: '', pd: '', arranque_automatico: false }
+    var ids   = { descargas: 'path-descargas', biblioteca: 'path-biblioteca', pd: 'path-pd' }
+
+    function api(endpoint, method, body) {
+      return fetch(BASE + endpoint, {
+        method:  method || 'GET',
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        body:    body ? JSON.stringify(body) : undefined
+      }).then(function(r) { return r.json() })
+    }
+
+    // Cargar config al abrir
+    window.addEventListener('DOMContentLoaded', function() {
+      api('/settings/config').then(function(cfg) {
+        rutas.descargas           = cfg.descargas
+        rutas.biblioteca          = cfg.biblioteca
+        rutas.pd                  = cfg.pd
+        rutas.arranque_automatico = cfg.arranque_automatico || false
+        document.getElementById('path-descargas').textContent  = cfg.descargas
+        document.getElementById('path-biblioteca').textContent = cfg.biblioteca
+        document.getElementById('path-pd').textContent         = cfg.pd
+        document.getElementById('toggle-arranque').checked     = rutas.arranque_automatico
+        document.getElementById('toggle-arranque').onchange    = function() {
+          rutas.arranque_automatico = this.checked
+        }
+      })
+    })
+
+    // Elegir carpeta: le pide a Python que abra el dialogo, luego espera la ruta
+    function elegir(campo, titulo) {
+      var btn = event.target
+      btn.disabled    = true
+      btn.textContent = '...'
+
+      api('/settings/elegir', 'POST', { campo: campo, titulo: titulo })
+        .then(function() {
+          // Long-poll: espera hasta que Python cierre el dialogo
+          return api('/settings/ruta')
+        })
+        .then(function(res) {
+          if (res.ruta) {
+            rutas[res.campo] = res.ruta
+            document.getElementById(ids[res.campo]).textContent = res.ruta
+          }
+          btn.disabled    = false
+          btn.textContent = 'Cambiar'
+        })
+        .catch(function() {
+          btn.disabled    = false
+          btn.textContent = 'Cambiar'
+        })
+    }
+
+    function guardar() {
+      api('/settings/guardar', 'POST', rutas)
+    }
+
+    function cancelar() {
+      api('/settings/cancelar', 'POST', {})
+    }
+  </script>
+</body>
+</html>

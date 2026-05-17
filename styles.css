@@ -1,0 +1,382 @@
+/* HOUSERO — styles.css */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #0f0f0f;
+  color: #f0f0f0;
+}
+
+.popup {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #0f0f0f;
+}
+
+/* ── HEADER ── */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px 24px 16px;
+  background: #161616;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.header .label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #f59e0b;
+}
+
+.header .filename {
+  font-size: 15px;
+  font-weight: 500;
+  color: #f0f0f0;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── SECTION ── */
+.section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  background: #0f0f0f;
+}
+
+.section > .label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #555;
+  padding: 12px 24px 8px;
+  border-bottom: 1px solid #1e1e1e;
+}
+
+/* ── FOLDER LIST ── */
+.folder-list {
+  list-style: none;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.folder-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.folder-list::-webkit-scrollbar-track {
+  background: #0f0f0f;
+}
+
+.folder-list::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 2px;
+}
+
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 24px;
+  font-size: 13px;
+  font-weight: 400;
+  color: #c0c0c0;
+  border-bottom: 1px solid #181818;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+
+.folder-item::before {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 11px;
+  background: #2a2a2a;
+  border-radius: 2px 4px 2px 2px;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.folder-item:hover {
+  background: #1a1a1a;
+  color: #f0f0f0;
+}
+
+.folder-item:hover::before {
+  background: #f59e0b;
+}
+
+.folder-item.selected {
+  background: #1c1c1c;
+  color: #f0f0f0;
+  border-left: 2px solid #f59e0b;
+  padding-left: 22px;
+}
+
+.folder-item.selected::before {
+  background: #f59e0b;
+}
+
+/* ── SYNC TITLE ── */
+.sync-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f0f0f0;
+  letter-spacing: 0.5px;
+}
+
+/* ── SUMMARY ── */
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #1e1e1e;
+}
+
+.summary-item {
+  font-size: 13px;
+  font-weight: 400;
+  color: #888;
+  padding: 4px 0;
+}
+
+.summary-copy {
+  color: #4ade80;
+}
+
+.summary-delete {
+  color: #f87171;
+}
+
+/* ── DELETE LIST ── */
+.delete-list {
+  list-style: none;
+  overflow-y: auto;
+  flex: 1;
+  max-height: 120px;
+}
+
+.delete-item {
+  font-size: 12px;
+  color: #666;
+  padding: 6px 24px;
+  border-bottom: 1px solid #181818;
+  font-family: 'Consolas', monospace;
+}
+
+/* ── PROGRESS ── */
+.progress-section {
+  padding: 16px 24px;
+  border-top: 1px solid #1e1e1e;
+}
+
+.progress-bar-bg {
+  width: 100%;
+  height: 3px;
+  background: #222;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: #f59e0b;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.progress-label {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── ACTIONS ── */
+.actions {
+  display: flex;
+  gap: 10px;
+  padding: 14px 24px;
+  background: #111;
+  border-top: 1px solid #1e1e1e;
+}
+
+.btn {
+  flex: 1;
+  padding: 9px 0;
+  border-radius: 6px;
+  border: 1px solid #2a2a2a;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn-cancel {
+  background: transparent;
+  color: #555;
+  border-color: #222;
+}
+
+.btn-cancel:hover {
+  background: #1a1a1a;
+  color: #888;
+  border-color: #333;
+}
+
+.btn-confirm {
+  background: #f59e0b;
+  color: #0f0f0f;
+  border-color: #f59e0b;
+}
+
+.btn-confirm:hover {
+  background: #fbbf24;
+  border-color: #fbbf24;
+}
+
+/* ── SETTINGS ── */
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 8px 0;
+  overflow-y: auto;
+}
+
+.setting-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 24px;
+  border-bottom: 1px solid #1e1e1e;
+}
+
+.setting-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #f0f0f0;
+}
+
+.setting-desc {
+  font-size: 11px;
+  color: #555;
+}
+
+.setting-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.setting-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.setting-path {
+  flex: 1;
+  font-size: 11px;
+  color: #888;
+  font-family: 'Consolas', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: #1a1a1a;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid #2a2a2a;
+}
+
+.btn-ruta {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #888;
+  font-size: 11px;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-ruta:hover {
+  background: #1a1a1a;
+  color: #f0f0f0;
+  border-color: #444;
+}
+
+/* ── TOGGLE — S28 arranque automático ── */
+.toggle-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-label input[type="checkbox"] {
+  display: none;
+}
+
+.toggle-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: #2a2a2a;
+  border-radius: 10px;
+  border: 1px solid #333;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #555;
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.toggle-label input:checked + .toggle-track {
+  background: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.toggle-label input:checked + .toggle-track::after {
+  transform: translateX(16px);
+  background: #0f0f0f;
+}

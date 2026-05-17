@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sounduct - Sync</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="popup">
+    <div class="header">
+      <span class="label">Pendrive conectado</span>
+      <h1 class="sync-title" id="sync-title">Calculando...</h1>
+    </div>
+    <div class="summary" id="summary"></div>
+    <div class="section" id="delete-section" style="display:none;">
+      <span class="label">Archivos a borrar del PD</span>
+      <ul class="delete-list" id="delete-list"></ul>
+    </div>
+    <div class="progress-section" id="progress-section" style="display:none;">
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+      <span class="progress-label" id="progress-label"></span>
+    </div>
+    <div class="actions" id="actions">
+      <button class="btn btn-cancel" onclick="cancelar()">Ahora no</button>
+      <button class="btn btn-confirm" id="btn-aplicar" onclick="aplicar()">Aplicar al PD</button>
+    </div>
+  </div>
+
+  <script>
+    var PORT = new URLSearchParams(location.search).get('port')
+    var BASE = 'http://127.0.0.1:' + PORT
+
+    function api(endpoint, method, body) {
+      return fetch(BASE + endpoint, {
+        method:  method || 'GET',
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        body:    body ? JSON.stringify(body) : undefined
+      }).then(function(r) { return r.json() })
+    }
+
+    window.addEventListener('DOMContentLoaded', function() {
+      api('/sync/datos').then(function(d) {
+        var summary = document.getElementById('summary')
+        var title   = document.getElementById('sync-title')
+        summary.innerHTML = ''
+
+        if (d.copiar === 0 && d.borrar === 0) {
+          title.textContent = 'Todo al dia'
+          var div = document.createElement('div')
+          div.className   = 'summary-item'
+          div.textContent = 'El PD ya esta actualizado'
+          summary.appendChild(div)
+          document.getElementById('btn-aplicar').disabled    = true
+          document.getElementById('btn-aplicar').style.opacity = '0.3'
+        } else {
+          var total = d.copiar + d.borrar
+          title.textContent = total + ' cambio' + (total > 1 ? 's' : '') + ' pendiente' + (total > 1 ? 's' : '')
+          if (d.copiar > 0) {
+            var div = document.createElement('div')
+            div.className   = 'summary-item summary-copy'
+            div.textContent = '+  ' + d.copiar + ' archivo' + (d.copiar > 1 ? 's' : '') + ' para copiar'
+            summary.appendChild(div)
+          }
+          if (d.borrar > 0) {
+            var div = document.createElement('div')
+            div.className   = 'summary-item summary-delete'
+            div.textContent = 'x  ' + d.borrar + ' archivo' + (d.borrar > 1 ? 's' : '') + ' para borrar'
+            summary.appendChild(div)
+          }
+        }
+
+        if (d.lista_borrar && d.lista_borrar.length > 0) {
+          var section = document.getElementById('delete-section')
+          var lista   = document.getElementById('delete-list')
+          section.style.display = 'flex'
+          lista.innerHTML = ''
+          d.lista_borrar.forEach(function(rel) {
+            var li = document.createElement('li')
+            li.className   = 'delete-item'
+            li.textContent = rel
+            lista.appendChild(li)
+          })
+        }
+      })
+    })
+
+    function aplicar() {
+      document.getElementById('actions').style.display          = 'none'
+      document.getElementById('progress-section').style.display = 'block'
+
+      api('/sync/aplicar', 'POST', {})
+
+      // Long-poll para progreso
+      function pollProgreso() {
+        api('/sync/progreso').then(function(res) {
+          if (res.items && res.items.length > 0) {
+            var ultimo = res.items[res.items.length - 1]
+            document.getElementById('progress-fill').style.width  = ultimo.pct + '%'
+            document.getElementById('progress-label').textContent = ultimo.nombre
+          }
+          if (!res.completado) {
+            pollProgreso()
+          }
+        }).catch(function() {
+          // silenciar errores de red al cerrar
+        })
+      }
+      pollProgreso()
+    }
+
+    function cancelar() {
+      api('/sync/cancelar', 'POST', {})
+    }
+  </script>
+</body>
+</html>
