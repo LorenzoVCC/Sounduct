@@ -281,6 +281,26 @@ class SoundductHandler(BaseHTTPRequestHandler):
         elif path == "/carpeta/carpetas":
             self._json_response({"carpetas": listar_carpetas()})
 
+        elif path == "/carpeta/audio":
+            # S31: sirve el archivo de audio desde Descargas
+            audio_path = _estado["carpeta"].get("path")
+            if not audio_path or not os.path.exists(audio_path):
+                self.send_response(404)
+                self.end_headers()
+                return
+            ext  = os.path.splitext(audio_path)[1].lower()
+            mime = {'.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.aiff': 'audio/aiff'}.get(ext, 'audio/mpeg')
+            size = os.path.getsize(audio_path)
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", mime)
+            self.send_header("Content-Length", str(size))
+            self.send_header("Accept-Ranges", "bytes")
+            self.end_headers()
+            with open(audio_path, 'rb') as f:
+                self.wfile.write(f.read())
+            return
+
         elif path == "/carpeta/esperar":
             # Bloquea hasta que el usuario confirme o cancele
             ev = _estado["carpeta"]["evento"]
@@ -473,9 +493,10 @@ def abrir_popup_settings(callback=None):
 # ──────────────────────────────────────────────
 #  POPUP CARPETA
 # ──────────────────────────────────────────────
-def abrir_popup_carpeta(nombre_archivo, callback):
+def abrir_popup_carpeta(nombre_archivo, path_archivo, callback):
     ev = threading.Event()
     _estado["carpeta"]["nombre"]    = nombre_archivo
+    _estado["carpeta"]["path"]      = path_archivo
     _estado["carpeta"]["resultado"] = None
     _estado["carpeta"]["evento"]    = ev
 
@@ -569,7 +590,7 @@ def procesar_archivo_nuevo(path):
         resultado[0] = carpeta
         done.set()
 
-    encolar(lambda: abrir_popup_carpeta(nombre, callback))
+    encolar(lambda: abrir_popup_carpeta(nombre, path, callback))
     done.wait()
 
     carpeta = resultado[0]

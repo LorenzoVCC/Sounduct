@@ -5,6 +5,80 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sounduct</title>
   <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* ── PLAYER ── */
+    .player {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 24px;
+      background: #161616;
+      border-bottom: 1px solid #2a2a2a;
+    }
+
+    .btn-play {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      background: #f59e0b;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, transform 0.1s;
+      padding: 0;
+    }
+
+    .btn-play:hover {
+      background: #fbbf24;
+      transform: scale(1.05);
+    }
+
+    .btn-play:active {
+      transform: scale(0.97);
+    }
+
+    .btn-play svg {
+      width: 14px;
+      height: 14px;
+      fill: #0f0f0f;
+    }
+
+    .player-bar {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .progress-track {
+      position: relative;
+      width: 100%;
+      height: 4px;
+      background: #2a2a2a;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #f59e0b;
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.1s linear;
+      pointer-events: none;
+    }
+
+    .progress-times {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #555;
+      font-family: 'Consolas', monospace;
+    }
+  </style>
 </head>
 <body>
   <div class="popup">
@@ -12,6 +86,26 @@
       <span class="label">Nuevo track detectado</span>
       <h1 class="filename" id="filename">Cargando...</h1>
     </div>
+
+    <!-- S29, S30, S31: Player -->
+    <div class="player">
+      <button class="btn-play" id="btn-play" onclick="togglePlay()">
+        <!-- Ícono play por defecto -->
+        <svg id="icon-play" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg id="icon-pause" viewBox="0 0 24 24" style="display:none;"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>
+      </button>
+
+      <div class="player-bar">
+        <div class="progress-track" id="progress-track" onclick="seekAudio(event)">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="progress-times">
+          <span id="time-current">0:00</span>
+          <span id="time-total">0:00</span>
+        </div>
+      </div>
+    </div>
+
     <div class="section">
       <span class="label">Carpeta destino</span>
       <ul class="folder-list" id="folder-list"></ul>
@@ -22,9 +116,13 @@
     </div>
   </div>
 
+  <!-- S31: Audio element apunta al endpoint HTTP -->
+  <audio id="audio"></audio>
+
   <script>
-    var PORT = new URLSearchParams(location.search).get('port')
-    var BASE = 'http://127.0.0.1:' + PORT
+    var PORT  = new URLSearchParams(location.search).get('port')
+    var BASE  = 'http://127.0.0.1:' + PORT
+    var audio = document.getElementById('audio')
 
     function api(endpoint, method, body) {
       return fetch(BASE + endpoint, {
@@ -34,7 +132,64 @@
       }).then(function(r) { return r.json() })
     }
 
+    function formatTime(s) {
+      if (isNaN(s)) return '0:00'
+      var m = Math.floor(s / 60)
+      var sec = Math.floor(s % 60)
+      return m + ':' + (sec < 10 ? '0' : '') + sec
+    }
+
+    // S29: toggle play/pausa con ícono dinámico
+    function togglePlay() {
+      if (audio.paused) {
+        audio.play()
+      } else {
+        audio.pause()
+      }
+    }
+
+    audio.addEventListener('play', function() {
+      document.getElementById('icon-play').style.display  = 'none'
+      document.getElementById('icon-pause').style.display = 'block'
+    })
+
+    audio.addEventListener('pause', function() {
+      document.getElementById('icon-play').style.display  = 'block'
+      document.getElementById('icon-pause').style.display = 'none'
+    })
+
+    // S30: actualizar barra de progreso
+    audio.addEventListener('timeupdate', function() {
+      if (!audio.duration) return
+      var pct = (audio.currentTime / audio.duration) * 100
+      document.getElementById('progress-fill').style.width    = pct + '%'
+      document.getElementById('time-current').textContent     = formatTime(audio.currentTime)
+    })
+
+    audio.addEventListener('loadedmetadata', function() {
+      document.getElementById('time-total').textContent = formatTime(audio.duration)
+    })
+
+    // S30: click en la barra para adelantar
+    function seekAudio(e) {
+      if (!audio.duration) return
+      var track = document.getElementById('progress-track')
+      var rect  = track.getBoundingClientRect()
+      var pct   = (e.clientX - rect.left) / rect.width
+      audio.currentTime = pct * audio.duration
+    }
+
+    // S32: detener audio al confirmar o cancelar
+    function detenerAudio() {
+      audio.pause()
+      audio.currentTime = 0
+    }
+
     window.addEventListener('DOMContentLoaded', function() {
+      // S31: cargar audio desde el endpoint HTTP
+      audio.src = BASE + '/carpeta/audio'
+      audio.load()
+
       // Cargar nombre del archivo
       api('/carpeta/nombre').then(function(res) {
         document.getElementById('filename').textContent = res.nombre
@@ -55,13 +210,14 @@
             li.classList.add('selected')
           })
           li.addEventListener('dblclick', function() {
+            detenerAudio()
             api('/carpeta/confirmar', 'POST', { carpeta: li.textContent.trim() })
           })
           lista.appendChild(li)
         })
       })
 
-      // Teclado: Enter confirma, Escape cancela, flechas navegan
+      // Teclado
       document.addEventListener('keydown', function(e) {
         var items = Array.from(document.querySelectorAll('.folder-item'))
         var idx   = items.findIndex(function(i) { return i.classList.contains('selected') })
@@ -77,17 +233,20 @@
           items[n].classList.add('selected')
           items[n].scrollIntoView({ block: 'nearest' })
         }
+        if (e.key === ' ') { e.preventDefault(); togglePlay() }
         if (e.key === 'Enter')  confirmar()
         if (e.key === 'Escape') cancelar()
       })
     })
 
     function confirmar() {
+      detenerAudio()
       var sel = document.querySelector('.folder-item.selected')
       if (sel) api('/carpeta/confirmar', 'POST', { carpeta: sel.textContent.trim() })
     }
 
     function cancelar() {
+      detenerAudio()
       api('/carpeta/cancelar', 'POST', {})
     }
   </script>
