@@ -281,6 +281,26 @@ class SoundductHandler(BaseHTTPRequestHandler):
         elif path == "/carpeta/carpetas":
             self._json_response({"carpetas": listar_carpetas()})
 
+        elif path == "/carpeta/audio":
+            # S31: sirve el archivo de audio desde Descargas
+            audio_path = _estado["carpeta"].get("path")
+            if not audio_path or not os.path.exists(audio_path):
+                self.send_response(404)
+                self.end_headers()
+                return
+            ext  = os.path.splitext(audio_path)[1].lower()
+            mime = {'.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.aiff': 'audio/aiff'}.get(ext, 'audio/mpeg')
+            size = os.path.getsize(audio_path)
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", mime)
+            self.send_header("Content-Length", str(size))
+            self.send_header("Accept-Ranges", "bytes")
+            self.end_headers()
+            with open(audio_path, 'rb') as f:
+                self.wfile.write(f.read())
+            return
+
         elif path == "/carpeta/esperar":
             # Bloquea hasta que el usuario confirme o cancele
             ev = _estado["carpeta"]["evento"]
@@ -329,6 +349,12 @@ class SoundductHandler(BaseHTTPRequestHandler):
             _config["arranque_automatico"] = data.get("arranque_automatico", get_arranque_automatico())
             guardar_config(_config)
             set_arranque_automatico(_config["arranque_automatico"])
+            # S34: crear carpetas al guardar (no al arrancar watchers)
+            try:
+                os.makedirs(get_descargas(),  exist_ok=True)
+                os.makedirs(get_biblioteca(), exist_ok=True)
+            except Exception as e:
+                print(f"[WARN] No se pudo crear carpeta: {e}")
             print(f"[CONFIG] Guardada: {_config}")
             encolar(_on_settings_guardado)
             self._json_response({"ok": True})
@@ -473,9 +499,10 @@ def abrir_popup_settings(callback=None):
 # ──────────────────────────────────────────────
 #  POPUP CARPETA
 # ──────────────────────────────────────────────
-def abrir_popup_carpeta(nombre_archivo, callback):
+def abrir_popup_carpeta(nombre_archivo, path_archivo, callback):
     ev = threading.Event()
     _estado["carpeta"]["nombre"]    = nombre_archivo
+    _estado["carpeta"]["path"]      = path_archivo
     _estado["carpeta"]["resultado"] = None
     _estado["carpeta"]["evento"]    = ev
 
@@ -569,7 +596,7 @@ def procesar_archivo_nuevo(path):
         resultado[0] = carpeta
         done.set()
 
-    encolar(lambda: abrir_popup_carpeta(nombre, callback))
+    encolar(lambda: abrir_popup_carpeta(nombre, path, callback))
     done.wait()
 
     carpeta = resultado[0]
@@ -697,7 +724,7 @@ def arrancar_watchers():
         _observer_bib.stop()
         _observer_bib.join()
 
-    os.makedirs(get_biblioteca(), exist_ok=True)
+    # S34: las carpetas se crean al guardar config, no acá
 
     manejador_dl = ManejadorDescargas()
     _observer_dl = Observer()
@@ -748,15 +775,19 @@ def actualizar_icono_tray(conectado):
         _tray.setIcon(_ICONO_GRIS)
         _tray.setToolTip("Sounduct — PD desconectado")
 
-def setup_tray(app):
+def setup_tray(app, config_pendiente=False):
     global _tray
     inicializar_iconos()
     _tray = QSystemTrayIcon(_ICONO_GRIS, app)
-    _tray.setToolTip("Sounduct")
+    _tray.setToolTip("Sounduct — configuracion pendiente" if config_pendiente else "Sounduct")
 
     menu = QMenu()
 
-    accion_estado = menu.addAction("● Sounduct activo")
+    # S35: estado diferente si no hay config
+    if config_pendiente:
+        accion_estado = menu.addAction("⚠ Configuracion pendiente")
+    else:
+        accion_estado = menu.addAction("● Sounduct activo")
     accion_estado.setEnabled(False)
     menu.addSeparator()
 
@@ -764,8 +795,12 @@ def setup_tray(app):
     def abrir_settings_desde_tray():
         def on_cerrado(guardo):
             if guardo:
-                arrancar_watchers()
-                print("[TRAY] Watchers reiniciados.")
+                # Si venía de config pendiente, arrancar app completa
+                if config_pendiente:
+                    iniciar_app()
+                else:
+                    arrancar_watchers()
+                    print("[TRAY] Watchers reiniciados.")
         encolar(lambda: abrir_popup_settings(callback=on_cerrado))
     accion_settings.triggered.connect(abrir_settings_desde_tray)
 
@@ -812,12 +847,13 @@ if __name__ == "__main__":
 
     if not os.path.exists(CONFIG_PATH):
         print("[CONFIG] Primera vez — abriendo configuracion inicial...")
+        # S35: tray mínimo con estado "pendiente" antes de configurar
+        setup_tray(app, config_pendiente=True)
         def on_primer_setup(guardo):
             if guardo:
                 iniciar_app()
             else:
                 print("[CONFIG] Cancelado. Usa el tray para configurar.")
-                setup_tray(app)
         abrir_popup_settings(callback=on_primer_setup)
     else:
         iniciar_app()
