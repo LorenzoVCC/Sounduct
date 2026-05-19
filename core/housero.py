@@ -18,11 +18,11 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 # ──────────────────────────────────────────────
 #  CONFIG PERSISTENTE
 # ──────────────────────────────────────────────
-BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH   = os.path.join(BASE_DIR, "config.json")
-HTML_CARPETA  = os.path.join(BASE_DIR, "popup_carpeta.html")
-HTML_SYNC     = os.path.join(BASE_DIR, "popup_sync.html")
-HTML_SETTINGS = os.path.join(BASE_DIR, "popup_settings.html")
+HTML_CARPETA  = os.path.join(BASE_DIR, "ui", "popup_carpeta.html")
+HTML_SYNC     = os.path.join(BASE_DIR, "ui", "popup_sync.html")
+HTML_SETTINGS = os.path.join(BASE_DIR, "ui", "popup_settings.html")
 
 CONFIG_DEFAULT = {
     "carpeta_descargas":  os.path.join(os.path.expanduser("~"), "Downloads"),
@@ -758,7 +758,7 @@ def _crear_icono(color):
 
 def inicializar_iconos():
     global _ICONO_AMBAR, _ICONO_GRIS
-    ico_path = os.path.join(BASE_DIR, "sounduct.ico")
+    ico_path = os.path.join(BASE_DIR, "assets", "sounduct.ico")
     if os.path.exists(ico_path):
         _ICONO_AMBAR = QIcon(ico_path)
         _ICONO_GRIS  = QIcon(ico_path)
