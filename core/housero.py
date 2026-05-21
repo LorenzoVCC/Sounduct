@@ -617,6 +617,31 @@ def abrir_popup_settings(callback=None):
 # ──────────────────────────────────────────────
 #  DESCARGA DESDE URL — Épica 9
 # ──────────────────────────────────────────────
+def _get_cookies_file():
+    """Copia el archivo de cookies de Chrome a un temp para evitar bloqueo mientras Chrome esta abierto."""
+    import shutil as _shutil
+    import tempfile
+    base = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Google", "Chrome", "User Data")
+    cookies_path = None
+    for perfil in ["Default", "Profile 1", "Profile 2", "Profile 3"]:
+        candidate = os.path.join(base, perfil, "Cookies")
+        if os.path.exists(candidate):
+            cookies_path = candidate
+            break
+    if not cookies_path:
+        print("[COOKIES] No se encontro base de cookies de Chrome")
+        return None
+    try:
+        tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        tmp.close()
+        _shutil.copy2(cookies_path, tmp.name)
+        print(f"[COOKIES] Cookies copiadas de: {cookies_path}")
+        return tmp.name
+    except Exception as e:
+        print(f"[COOKIES] No se pudo copiar: {e}")
+        return None
+
+
 def _limpiar_url(url):
     """Limpia parámetros de playlist de URLs de YouTube."""
     from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
@@ -651,17 +676,23 @@ def _descargar_url(url, carpeta, formato="mp3"):
 
     # Usar sys.executable para garantizar que encuentra yt-dlp
     # independientemente del PATH del sistema
+    cookies_file = _get_cookies_file()
+
     cmd = [
         sys.executable, "-m", "yt_dlp",
         "--extract-audio",
         "--audio-format", formato,
         "--audio-quality", "0",
         "--no-playlist",
-        "--cookies-from-browser", "chrome",   # evita bloqueo anti-bot de YouTube
         "--output", os.path.join(destino, "%(title)s.%(ext)s"),
         "--newline",
         url
     ]
+    if cookies_file:
+        cmd.extend(["--cookies", cookies_file])
+        print(f"[COOKIES] Usando cookies de Chrome: {cookies_file}")
+    else:
+        print("[COOKIES] Sin cookies, descargando sin autenticacion")
 
     print(f"[DESCARGA] {url} → {destino}")
     try:
@@ -708,13 +739,16 @@ def _descargar_url(url, carpeta, formato="mp3"):
             d["error"] = "Error al descargar. Verificá la URL."
             print(f"[ERROR] yt-dlp returncode: {proc.returncode}")
     except FileNotFoundError:
-        d["error"] = "yt-dlp no encontrado. Instalá con: pip install yt-dlp"
+        d["error"] = "yt-dlp no encontrado. Instala con: pip install yt-dlp"
         print("[ERROR] yt-dlp no instalado")
     except Exception as e:
         d["error"] = str(e)
         print(f"[ERROR] Descarga: {e}")
     finally:
         d["activa"] = False
+        if cookies_file and os.path.exists(cookies_file):
+            try: os.remove(cookies_file)
+            except: pass
 
 
 def _abrir_siguiente_de_bandeja():
