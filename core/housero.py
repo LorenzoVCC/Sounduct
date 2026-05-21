@@ -1183,7 +1183,7 @@ def inicializar_iconos():
         _ICONO_AMBAR = QIcon(ico_path)
         _ICONO_GRIS  = QIcon(ico_path)
     else:
-        _ICONO_AMBAR = _crear_icono("#f59e0b")
+        _ICONO_AMBAR = _crear_icono("#8B53FF")
         _ICONO_GRIS  = _crear_icono("#6b7280")
 
 def actualizar_icono_tray(conectado):

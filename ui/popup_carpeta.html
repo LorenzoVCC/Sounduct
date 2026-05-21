@@ -36,13 +36,13 @@
     .bandeja-item.activo {
       background: #161616;
       color: #f0f0f0;
-      border-left: 2px solid #f59e0b;
+      border-left: 2px solid #8B53FF;
       padding-left: 22px;
     }
 
     .bandeja-item .track-num {
       font-size: 10px;
-      color: #f59e0b;
+      color: #8B53FF;
       font-weight: 700;
       min-width: 16px;
     }
@@ -73,7 +73,7 @@
 
     .bandeja-count {
       font-size: 10px;
-      color: #f59e0b;
+      color: #8B53FF;
       font-weight: 700;
     }
 
@@ -91,7 +91,7 @@
       flex-shrink: 0;
       width: 32px;
       height: 32px;
-      background: #f59e0b;
+      background: #8B53FF;
       border: none;
       border-radius: 50%;
       cursor: pointer;
@@ -102,7 +102,7 @@
       padding: 0;
     }
 
-    .btn-play:hover  { background: #fbbf24; transform: scale(1.05); }
+    .btn-play:hover  { background: #a78bfa; transform: scale(1.05); }
     .btn-play:active { transform: scale(0.97); }
     .btn-play svg    { width: 14px; height: 14px; fill: #0f0f0f; }
 
@@ -124,7 +124,7 @@
 
     .progress-fill {
       height: 100%;
-      background: #f59e0b;
+      background: #8B53FF;
       border-radius: 2px;
       width: 0%;
       transition: width 0.1s linear;
@@ -162,14 +162,14 @@
       transition: border-color 0.15s;
     }
 
-    .url-input:focus        { border-color: #f59e0b; }
+    .url-input:focus        { border-color: #8B53FF; }
     .url-input::placeholder { color: #444; }
     .url-input:disabled     { opacity: 0.3; cursor: not-allowed; }
 
     .btn-download {
       flex-shrink: 0;
       padding: 6px 14px;
-      background: #f59e0b;
+      background: #8B53FF;
       border: none;
       border-radius: 4px;
       color: #0f0f0f;
@@ -182,7 +182,7 @@
       transition: background 0.15s;
     }
 
-    .btn-download:hover    { background: #fbbf24; }
+    .btn-download:hover    { background: #a78bfa; }
     .btn-download:disabled { opacity: 0.4; cursor: not-allowed; }
 
     /* ── FORMATO ── */
@@ -218,7 +218,7 @@
     }
 
     .btn-formato:hover  { border-color: #444; color: #aaa; }
-    .btn-formato.active { background: #1a1a1a; border-color: #f59e0b; color: #f59e0b; }
+    .btn-formato.active { background: #1a1a1a; border-color: #8B53FF; color: #8B53FF; }
 
     /* ── DESCARGA STATUS ── */
     .download-status {
@@ -238,13 +238,13 @@
     .download-status.ok    { color: #4ade80; }
 
     .download-progress-bar  { height: 2px; background: #2a2a2a; display: none; }
-    .download-progress-fill { height: 100%; background: #f59e0b; width: 0%; transition: width 0.2s ease; }
+    .download-progress-fill { height: 100%; background: #8B53FF; width: 0%; transition: width 0.2s ease; }
   </style>
 </head>
 <body>
   <div class="popup">
     <div class="header">
-      <span class="label" id="header-label">Nuevo track detectado <span id="cola-counter" style="color:#555;font-weight:400;letter-spacing:0;text-transform:none;font-size:10px;margin-left:8px;"></span></span>
+      <span class="label" id="header-label">Nuevo track detectado</span>
       <h1 class="filename" id="filename">Cargando...</h1>
     </div>
 
@@ -355,14 +355,6 @@
         var section    = document.getElementById('bandeja-section')
         var lista      = document.getElementById('bandeja-lista')
         var count      = document.getElementById('bandeja-count')
-        var counter    = document.getElementById('cola-counter')
-
-        // Actualizar contador x/x en el header
-        if (res.total && res.total > 1) {
-          counter.textContent = res.posicion + ' / ' + res.total
-        } else {
-          counter.textContent = ''
-        }
 
         if (pendientes.length === 0) {
           section.style.display = 'none'
@@ -376,7 +368,7 @@
         pendientes.forEach(function(t) {
           var item = document.createElement('div')
           item.className = 'bandeja-item'
-          item.innerHTML = '<span class="track-num">' + (t.idx + 2) + '</span>' +
+          item.innerHTML = '<span class="track-num">' + (t.idx + 1) + '</span>' +
                            '<span class="track-nombre">' + t.nombre + '</span>'
           item.addEventListener('click', function() {
             seleccionarDeBandeja(t.idx, t.nombre)

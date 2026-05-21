@@ -41,7 +41,7 @@ html, body {
   font-weight: 600;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: #f59e0b;
+  color: #8B53FF;
 }
 
 .header .filename {
@@ -124,18 +124,18 @@ html, body {
 }
 
 .folder-item:hover::before {
-  background: #f59e0b;
+  background: #8B53FF;
 }
 
 .folder-item.selected {
   background: #1c1c1c;
   color: #f0f0f0;
-  border-left: 2px solid #f59e0b;
+  border-left: 2px solid #8B53FF;
   padding-left: 22px;
 }
 
 .folder-item.selected::before {
-  background: #f59e0b;
+  background: #8B53FF;
 }
 
 /* ── SYNC TITLE ── */
@@ -202,7 +202,7 @@ html, body {
 
 .progress-bar-fill {
   height: 100%;
-  background: #f59e0b;
+  background: #8B53FF;
   border-radius: 2px;
   transition: width 0.3s ease;
 }
@@ -253,14 +253,14 @@ html, body {
 }
 
 .btn-confirm {
-  background: #f59e0b;
+  background: #8B53FF;
   color: #0f0f0f;
-  border-color: #f59e0b;
+  border-color: #8B53FF;
 }
 
 .btn-confirm:hover {
-  background: #fbbf24;
-  border-color: #fbbf24;
+  background: #8B53FF;
+  border-color: #8B53FF;
 }
 
 /* ── SETTINGS ── */
@@ -372,8 +372,8 @@ html, body {
 }
 
 .toggle-label input:checked + .toggle-track {
-  background: #f59e0b;
-  border-color: #f59e0b;
+  background: #8B53FF;
+  border-color: #8B53FF;
 }
 
 .toggle-label input:checked + .toggle-track::after {
