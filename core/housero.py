@@ -196,11 +196,26 @@ def pd_rename_dir(rel_src, rel_dst):
 # ──────────────────────────────────────────────
 #  ESTADO COMPARTIDO — popups activos
 # ──────────────────────────────────────────────
+# Épica 10: bandeja de tracks pendientes
+_bandeja             = []   # lista de {nombre, path, callback}
+_bandeja_lock        = threading.Lock()
+_popup_auto_abierto  = False   # True cuando hay un popup de track auto abierto
+_popup_manual_abierto = False  # True cuando está abierto el popup manual
+
 _estado = {
     "carpeta": {
         "nombre":    None,
+        "path":      None,
         "resultado": None,
         "evento":    None,
+        "modo":      "auto",   # "auto" = track detectado, "manual" = abierto desde tray
+        "descarga": {
+            "activa":     False,
+            "progreso":   [],
+            "completado": False,
+            "error":      None,
+            "archivo":    None,
+        }
     },
     "sync": {
         "copiar":      [],
@@ -275,6 +290,10 @@ class SoundductHandler(BaseHTTPRequestHandler):
             })
 
         # ── CARPETA ──
+        elif path == "/carpeta/modo":
+            # S40: el HTML necesita saber en qué modo está
+            self._json_response({"modo": _estado["carpeta"]["modo"]})
+
         elif path == "/carpeta/nombre":
             self._json_response({"nombre": _estado["carpeta"]["nombre"] or ""})
 
@@ -284,6 +303,68 @@ class SoundductHandler(BaseHTTPRequestHandler):
         elif path == "/carpeta/audio":
             # S31: sirve el archivo de audio desde Descargas
             audio_path = _estado["carpeta"].get("path")
+            if not audio_path or not os.path.exists(audio_path):
+                self.send_response(404)
+                self.end_headers()
+                return
+            ext  = os.path.splitext(audio_path)[1].lower()
+            mime = {'.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.aiff': 'audio/aiff'}.get(ext, 'audio/mpeg')
+            size = os.path.getsize(audio_path)
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", mime)
+            self.send_header("Content-Length", str(size))
+            self.send_header("Accept-Ranges", "bytes")
+            self.end_headers()
+            with open(audio_path, 'rb') as f:
+                self.wfile.write(f.read())
+            return
+
+        elif path == "/carpeta/progreso_descarga":
+            # S42: long-poll para progreso de descarga yt-dlp
+            d = _estado["carpeta"]["descarga"]
+            inicio = time.time()
+            while not d["progreso"] and not d["completado"] and not d["error"]:
+                if time.time() - inicio > 30:
+                    break
+                time.sleep(0.2)
+            prog = d["progreso"].copy()
+            d["progreso"].clear()
+            self._json_response({
+                "items":      prog,
+                "completado": d["completado"],
+                "error":      d["error"],
+                "archivo":    d["archivo"]
+            })
+            return
+
+        elif path == "/carpeta/bandeja":
+            # S50: devuelve lista de tracks en bandeja + track actual + posición
+            with _bandeja_lock:
+                pendientes = [{"nombre": t["nombre"], "idx": i} for i, t in enumerate(_bandeja)]
+            total    = 1 + len(pendientes)   # actual + pendientes
+            self._json_response({
+                "actual": {
+                    "nombre": _estado["carpeta"]["nombre"] or "",
+                    "idx":    -1
+                },
+                "pendientes": pendientes,
+                "posicion":   1,        # el actual siempre es el 1
+                "total":      total
+            })
+
+        elif path == "/carpeta/audio":
+            # Sirve audio — puede ser del track actual o de uno de la bandeja
+            qs    = parse_qs(urlparse(self.path).query)
+            idx   = int(qs.get("idx", ["-1"])[0])
+            if idx == -1:
+                audio_path = _estado["carpeta"].get("path")
+            else:
+                with _bandeja_lock:
+                    if 0 <= idx < len(_bandeja):
+                        audio_path = _bandeja[idx]["path"]
+                    else:
+                        audio_path = None
             if not audio_path or not os.path.exists(audio_path):
                 self.send_response(404)
                 self.end_headers()
@@ -374,11 +455,45 @@ class SoundductHandler(BaseHTTPRequestHandler):
             self._json_response({"ok": True})
 
         # ── CARPETA ──
+        elif path == "/carpeta/descargar":
+            # S40/S41/S43/S44/S46: descarga con yt-dlp directo a la carpeta elegida
+            url     = data.get("url", "")
+            carpeta = data.get("carpeta", "")
+            formato = data.get("formato", "mp3")   # S46: mp3/wav/aiff
+            if not url:
+                self._json_response({"ok": False, "error": "URL vacía"})
+                return
+            threading.Thread(
+                target=_descargar_url,
+                args=(url, carpeta, formato),
+                daemon=True
+            ).start()
+            self._json_response({"ok": True})
+
         elif path == "/carpeta/confirmar":
             carpeta = data.get("carpeta", "")
-            _estado["carpeta"]["resultado"] = carpeta
-            ev = _estado["carpeta"]["evento"]
-            if ev: ev.set()
+            idx     = data.get("idx", -1)
+
+            if idx == -1:
+                # Confirmar track actual (comportamiento original)
+                _estado["carpeta"]["resultado"] = carpeta
+                ev = _estado["carpeta"]["evento"]
+                if ev: ev.set()
+            else:
+                # S52: confirmar track de la bandeja por índice
+                with _bandeja_lock:
+                    if 0 <= idx < len(_bandeja):
+                        track = _bandeja.pop(idx)
+                    else:
+                        track = None
+                if track:
+                    actualizar_tray_bandeja()
+                    threading.Thread(
+                        target=_mover_track,
+                        args=(track["path"], track["nombre"], carpeta, track["callback"]),
+                        daemon=True
+                    ).start()
+
             self._json_response({"ok": True})
 
         elif path == "/carpeta/cancelar":
@@ -437,7 +552,7 @@ from PySide6.QtWebEngineCore import QWebEngineSettings
 def crear_ventana(nombre, ancho, alto, html_path, frameless=True):
     view = QWebEngineView()
     view.setFixedSize(ancho, alto)
-    flags = Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Window
+    flags = Qt.WindowType.Window
     if frameless:
         flags |= Qt.WindowType.FramelessWindowHint
     view.setWindowFlags(flags)
@@ -499,19 +614,255 @@ def abrir_popup_settings(callback=None):
 # ──────────────────────────────────────────────
 #  POPUP CARPETA
 # ──────────────────────────────────────────────
-def abrir_popup_carpeta(nombre_archivo, path_archivo, callback):
+# ──────────────────────────────────────────────
+#  DESCARGA DESDE URL — Épica 9
+# ──────────────────────────────────────────────
+def _limpiar_url(url):
+    """Limpia parámetros de playlist de URLs de YouTube."""
+    from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
+    try:
+        parsed = urlparse(url)
+        params = parse_qs(parsed.query)
+        # Mantener solo 'v' (video ID) y descartar list, index, pp, etc.
+        limpio = {k: v for k, v in params.items() if k == 'v'}
+        nueva_query = urlencode(limpio, doseq=True)
+        return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, nueva_query, parsed.fragment))
+    except:
+        return url
+
+
+def _descargar_url(url, carpeta, formato="mp3"):
+    """S40/S41/S46: descarga con yt-dlp en el formato elegido directo a la carpeta."""
+    import subprocess
+    url = _limpiar_url(url)
+    d = _estado["carpeta"]["descarga"]
+    d["activa"]     = True
+    d["completado"] = False
+    d["error"]      = None
+    d["archivo"]    = None
+    d["progreso"]   = []
+
+    # Carpeta destino
+    if carpeta in ("/ Raiz", "/ Raíz", ""):
+        destino = get_biblioteca()
+    else:
+        destino = os.path.join(get_biblioteca(), carpeta)
+    os.makedirs(destino, exist_ok=True)
+
+    # Usar sys.executable para garantizar que encuentra yt-dlp
+    # independientemente del PATH del sistema
+    cmd = [
+        sys.executable, "-m", "yt_dlp",
+        "--extract-audio",
+        "--audio-format", formato,
+        "--audio-quality", "0",
+        "--no-playlist",
+        "--cookies-from-browser", "chrome",   # evita bloqueo anti-bot de YouTube
+        "--output", os.path.join(destino, "%(title)s.%(ext)s"),
+        "--newline",
+        url
+    ]
+
+    print(f"[DESCARGA] {url} → {destino}")
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace"
+        )
+        archivo_final = None
+        for line in proc.stdout:
+            line = line.strip()
+            print(f"[yt-dlp] {line}")
+            # Parsear progreso
+            if "[download]" in line and "%" in line:
+                try:
+                    pct_str = line.split("%")[0].split()[-1]
+                    pct = float(pct_str)
+                    d["progreso"].append({"pct": pct, "texto": line})
+                except: pass
+            # Detectar archivo final
+            if "[ExtractAudio] Destination:" in line:
+                archivo_final = line.split("Destination:")[-1].strip()
+            elif "Destination:" in line and line.endswith(".mp3"):
+                archivo_final = line.split("Destination:")[-1].strip()
+
+        proc.wait()
+        if proc.returncode == 0:
+            d["completado"] = True
+            d["archivo"]    = archivo_final
+            d["progreso"].append({"pct": 100, "texto": "Descarga completada"})
+            print(f"[DESCARGA] Completada: {archivo_final}")
+            # S44: copiar al PD si está conectado
+            if archivo_final and pd_conectado():
+                try:
+                    rel = os.path.relpath(archivo_final, get_biblioteca())
+                    pd_copy(rel)
+                    encolar(lambda n=os.path.basename(archivo_final): notificar("Sounduct", f"{n} copiado al PD"))
+                except Exception as e:
+                    print(f"[ERROR] Copiando al PD: {e}")
+        else:
+            d["error"] = "Error al descargar. Verificá la URL."
+            print(f"[ERROR] yt-dlp returncode: {proc.returncode}")
+    except FileNotFoundError:
+        d["error"] = "yt-dlp no encontrado. Instalá con: pip install yt-dlp"
+        print("[ERROR] yt-dlp no instalado")
+    except Exception as e:
+        d["error"] = str(e)
+        print(f"[ERROR] Descarga: {e}")
+    finally:
+        d["activa"] = False
+
+
+def _abrir_siguiente_de_bandeja():
+    """S50/S51: abre el siguiente track de la bandeja si hay alguno."""
+    global _popup_auto_abierto
+    with _bandeja_lock:
+        if not _bandeja:
+            _popup_auto_abierto = False
+            actualizar_tray_bandeja()
+            return
+        siguiente = _bandeja.pop(0)
+
+    actualizar_tray_bandeja()
+    _abrir_popup_auto(siguiente["nombre"], siguiente["path"], siguiente["callback"])
+
+
+def _mover_track(path, nombre, carpeta, callback):
+    """S52: mueve un track de la bandeja a su carpeta destino."""
+    import shutil as _shutil
+    if carpeta in ("/ Raiz", "/ Raíz", ""):
+        destino = os.path.join(get_biblioteca(), nombre)
+        rel = nombre
+    else:
+        destino = os.path.join(get_biblioteca(), carpeta, nombre)
+        rel = os.path.join(carpeta, nombre)
+
+    try:
+        os.makedirs(os.path.dirname(destino), exist_ok=True)
+        if os.path.abspath(path) != os.path.abspath(destino):
+            _shutil.move(path, destino)
+            print(f"[LOCAL] Movido: {rel}")
+        if pd_conectado():
+            pd_copy(rel)
+            encolar(lambda n=nombre: notificar("Sounduct", f"{n} copiado al PD"))
+    except Exception as e:
+        print(f"[ERROR] _mover_track: {e}")
+
+    if callback:
+        callback(carpeta)
+
+
+def _abrir_popup_auto(nombre_archivo, path_archivo, callback):
+    """S50: abre el popup con bandeja integrada."""
+    global _popup_auto_abierto
+    _popup_auto_abierto = True
+
     ev = threading.Event()
     _estado["carpeta"]["nombre"]    = nombre_archivo
     _estado["carpeta"]["path"]      = path_archivo
     _estado["carpeta"]["resultado"] = None
     _estado["carpeta"]["evento"]    = ev
+    _estado["carpeta"]["modo"]      = "auto"
+    _estado["carpeta"]["callback_actual"] = callback
 
-    crear_ventana("carpeta", 650, 480, HTML_CARPETA)
+    crear_ventana("carpeta", 680, 580, HTML_CARPETA)
+
+    def esperar():
+        global _popup_auto_abierto
+        ev.wait(timeout=300)
+        carpeta = _estado["carpeta"]["resultado"]
+        # Mover el track actual
+        if carpeta is not None:
+            threading.Thread(
+                target=_mover_track,
+                args=(path_archivo, nombre_archivo, carpeta, callback),
+                daemon=True
+            ).start()
+        else:
+            # Cancelado → raiz
+            threading.Thread(
+                target=_mover_track,
+                args=(path_archivo, nombre_archivo, "", callback),
+                daemon=True
+            ).start()
+
+        # S51: verificar si quedan tracks en bandeja
+        with _bandeja_lock:
+            quedan = len(_bandeja)
+
+        if quedan > 0:
+            # Actualizar popup con el siguiente track sin cerrar
+            siguiente = None
+            with _bandeja_lock:
+                if _bandeja:
+                    siguiente = _bandeja.pop(0)
+            if siguiente:
+                actualizar_tray_bandeja()
+                # Actualizar estado con el siguiente track
+                ev2 = threading.Event()
+                _estado["carpeta"]["nombre"]          = siguiente["nombre"]
+                _estado["carpeta"]["path"]            = siguiente["path"]
+                _estado["carpeta"]["resultado"]       = None
+                _estado["carpeta"]["evento"]          = ev2
+                _estado["carpeta"]["callback_actual"] = siguiente["callback"]
+                # Decirle al HTML que recargue
+                view = _ventanas.get("carpeta")
+                if view:
+                    port = _PUERTO
+                    encolar(lambda p=port: view.page().runJavaScript(
+                        f"if(typeof recargarBandeja==='function') recargarBandeja();"
+                    ))
+                # Esperar la próxima confirmación
+                ev2.wait(timeout=300)
+                carpeta2 = _estado["carpeta"]["resultado"]
+                sig_nombre = siguiente["nombre"]
+                sig_path   = siguiente["path"]
+                sig_cb     = siguiente["callback"]
+                threading.Thread(
+                    target=_mover_track,
+                    args=(sig_path, sig_nombre, carpeta2 if carpeta2 is not None else "", sig_cb),
+                    daemon=True
+                ).start()
+                # Recursivo para los siguientes
+                with _bandeja_lock:
+                    quedan2 = len(_bandeja)
+                if quedan2 == 0:
+                    _popup_auto_abierto = False
+                    encolar(lambda: _cerrar_popup("carpeta"))
+                    actualizar_tray_bandeja()
+        else:
+            _popup_auto_abierto = False
+            encolar(lambda: _cerrar_popup("carpeta"))
+            actualizar_tray_bandeja()
+
+    threading.Thread(target=esperar, daemon=True).start()
+
+
+def abrir_popup_carpeta(nombre_archivo, path_archivo, callback, modo="auto"):
+    global _popup_manual_abierto
+    ev = threading.Event()
+    _estado["carpeta"]["nombre"]    = nombre_archivo
+    _estado["carpeta"]["path"]      = path_archivo
+    _estado["carpeta"]["resultado"] = None
+    _estado["carpeta"]["evento"]    = ev
+    _estado["carpeta"]["modo"]      = modo
+
+    if modo == "manual":
+        _popup_manual_abierto = True
+
+    crear_ventana("carpeta", 650, 520, HTML_CARPETA)
 
     def esperar():
         ev.wait(timeout=300)
         carpeta = _estado["carpeta"]["resultado"]
         encolar(lambda: _cerrar_popup("carpeta"))
+        if modo == "manual":
+            global _popup_manual_abierto
+            _popup_manual_abierto = False
         callback(carpeta)
 
     threading.Thread(target=esperar, daemon=True).start()
@@ -596,7 +947,29 @@ def procesar_archivo_nuevo(path):
         resultado[0] = carpeta
         done.set()
 
-    encolar(lambda: abrir_popup_carpeta(nombre, path, callback))
+    # S48/S50: si ya hay un popup auto abierto o hay tracks en bandeja, encolar
+    with _bandeja_lock:
+        hay_bandeja = len(_bandeja) > 0
+
+    if _popup_auto_abierto or hay_bandeja:
+        print(f"[BANDEJA] Encolando: {nombre}")
+        with _bandeja_lock:
+            _bandeja.append({"nombre": nombre, "path": path, "callback": callback})
+        actualizar_tray_bandeja()
+        done.wait()
+        return
+
+    # Si popup manual abierto, encolar también
+    if _popup_manual_abierto:
+        print(f"[BANDEJA] Popup manual abierto, encolando: {nombre}")
+        with _bandeja_lock:
+            _bandeja.append({"nombre": nombre, "path": path, "callback": callback})
+        actualizar_tray_bandeja()
+        done.wait()
+        return
+
+    # S48: primer track — abrir popup directamente
+    encolar(lambda: _abrir_popup_auto(nombre, path, callback))
     done.wait()
 
     carpeta = resultado[0]
@@ -643,9 +1016,20 @@ _proceso_lock = threading.Lock()
 def es_ignorable(path):
     return os.path.splitext(path)[1].lower() in IGNORAR_EXT
 
+def _esta_en_biblioteca(path):
+    """Verifica si un path está dentro de la biblioteca — evita doble detección."""
+    try:
+        bib = os.path.abspath(get_biblioteca())
+        return os.path.abspath(path).startswith(bib + os.sep) or os.path.abspath(path) == bib
+    except:
+        return False
+
+
 class ManejadorDescargas(FileSystemEventHandler):
     def on_created(self, event):
         if event.is_directory or es_ignorable(event.src_path):
+            return
+        if _esta_en_biblioteca(event.src_path):
             return
         with _proceso_lock:
             if event.src_path in _archivos_en_proceso: return
@@ -661,6 +1045,8 @@ class ManejadorDescargas(FileSystemEventHandler):
 
     def on_moved(self, event):
         if not event.is_directory and es_audio(event.dest_path):
+            if _esta_en_biblioteca(event.dest_path):
+                return
             src_ext = os.path.splitext(event.src_path)[1].lower()
             if src_ext in IGNORAR_EXT or not es_audio(event.src_path):
                 threading.Thread(target=procesar_archivo_nuevo, args=(event.dest_path,), daemon=True).start()
@@ -768,12 +1154,24 @@ def inicializar_iconos():
 
 def actualizar_icono_tray(conectado):
     if _tray is None: return
-    if conectado:
+    with _bandeja_lock:
+        pendientes = len(_bandeja)
+    if pendientes > 0:
+        # S49: mostrar cantidad de tracks en cola
+        _tray.setIcon(_ICONO_AMBAR)
+        _tray.setToolTip(f"Sounduct — {pendientes} track{'s' if pendientes > 1 else ''} pendiente{'s' if pendientes > 1 else ''}")
+    elif conectado:
         _tray.setIcon(_ICONO_AMBAR)
         _tray.setToolTip("Sounduct — PD conectado")
     else:
         _tray.setIcon(_ICONO_GRIS)
         _tray.setToolTip("Sounduct — PD desconectado")
+
+
+def actualizar_tray_bandeja():
+    """S49: actualizar ícono y tooltip según bandeja."""
+    pd = pd_conectado()
+    encolar(lambda p=pd: actualizar_icono_tray(p))
 
 def setup_tray(app, config_pendiente=False):
     global _tray
@@ -790,6 +1188,19 @@ def setup_tray(app, config_pendiente=False):
         accion_estado = menu.addAction("● Sounduct activo")
     accion_estado.setEnabled(False)
     menu.addSeparator()
+
+    # S39: Abrir menu manual de descarga
+    if not config_pendiente:
+        accion_menu = menu.addAction("Descargar URL")
+        def abrir_menu_manual():
+            if _popup_manual_abierto:
+                print("[TRAY] Menu manual ya abierto.")
+                return
+            def callback_manual(carpeta):
+                pass  # en modo manual no hay archivo que mover
+            encolar(lambda: abrir_popup_carpeta("", None, callback_manual, modo="manual"))
+        accion_menu.triggered.connect(abrir_menu_manual)
+        menu.addSeparator()
 
     accion_settings = menu.addAction("Configuracion")
     def abrir_settings_desde_tray():
