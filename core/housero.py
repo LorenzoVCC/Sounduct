@@ -149,13 +149,59 @@ def calcular_diff():
             rel  = os.path.relpath(path, get_pd())
             try: pd_files[rel] = os.path.getsize(path)
             except: pass
+
+    # B02: detectar renames de carpeta antes del diff normal
+    # Si una carpeta desapareció del PD y apareció una nueva con los mismos archivos
+    # (mismo nombre de archivo y mismo tamaño), es un rename — no borrar+copiar
+    renames = _detectar_renames(casa, pd_files)
+
     for rel, size in casa.items():
         if rel not in pd_files or pd_files[rel] != size:
-            copiar.append(rel)
+            # Verificar que no es parte de un rename ya detectado
+            if not any(rel == dst for _, dst in renames):
+                copiar.append(rel)
     for rel in pd_files:
         if rel not in casa:
-            borrar.append(rel)
+            if not any(rel == src for src, _ in renames):
+                borrar.append(rel)
     return copiar, borrar
+
+def _detectar_renames(casa, pd_files):
+    """B02: detecta carpetas renombradas comparando archivos por nombre+tamaño.
+    Devuelve lista de (rel_pd_viejo, rel_biblioteca_nuevo)."""
+    import os.path as osp
+
+    # Agrupar archivos del PD por carpeta
+    pd_por_carpeta = {}
+    for rel, size in pd_files.items():
+        carpeta = osp.dirname(rel)
+        pd_por_carpeta.setdefault(carpeta, {})[osp.basename(rel)] = size
+
+    # Agrupar archivos de la biblioteca por carpeta
+    bib_por_carpeta = {}
+    for rel, size in casa.items():
+        carpeta = osp.dirname(rel)
+        bib_por_carpeta.setdefault(carpeta, {})[osp.basename(rel)] = size
+
+    renames = []
+    carpetas_pd  = set(pd_por_carpeta.keys())
+    carpetas_bib = set(bib_por_carpeta.keys())
+    desaparecidas = carpetas_pd - carpetas_bib
+    nuevas        = carpetas_bib - carpetas_pd
+
+    for vieja in desaparecidas:
+        for nueva in nuevas:
+            archivos_viejos = pd_por_carpeta[vieja]
+            archivos_nuevos = bib_por_carpeta[nueva]
+            # Si tienen los mismos archivos (nombre y tamaño), es un rename
+            if archivos_viejos == archivos_nuevos and len(archivos_viejos) > 0:
+                for nombre in archivos_viejos:
+                    renames.append((
+                        osp.join(vieja, nombre),   # ruta vieja en PD
+                        osp.join(nueva, nombre)    # ruta nueva en biblioteca
+                    ))
+                break
+    return renames
 
 def _limpiar_carpetas_vacias(dirpath):
     while True:
@@ -210,7 +256,9 @@ _estado = {
         "path":      None,
         "resultado": None,
         "evento":    None,
-        "modo":      "auto",   # "auto" = track detectado, "manual" = abierto desde tray
+        "modo":      "auto",
+        "posicion":  1,     # B03: posición del track actual en la sesión
+        "total":     1,     # B03: total de tracks en la sesión
         "descarga": {
             "activa":     False,
             "progreso":   [],
@@ -378,15 +426,14 @@ class SoundductHandler(BaseHTTPRequestHandler):
             # S50: devuelve lista de tracks en bandeja + track actual + posición
             with _bandeja_lock:
                 pendientes = [{"nombre": t["nombre"], "idx": i} for i, t in enumerate(_bandeja)]
-            total    = 1 + len(pendientes)   # actual + pendientes
             self._json_response({
                 "actual": {
                     "nombre": _estado["carpeta"]["nombre"] or "",
                     "idx":    -1
                 },
                 "pendientes": pendientes,
-                "posicion":   1,        # el actual siempre es el 1
-                "total":      total
+                "posicion":   _estado["carpeta"]["posicion"],
+                "total":      _estado["carpeta"]["total"]
             })
 
         elif path == "/carpeta/esperar":
@@ -574,6 +621,8 @@ def crear_ventana(nombre, ancho, alto, html_path, frameless=True):
     url.setQuery(f"port={_PUERTO}")
     view.load(url)
     view.show()
+    view.raise_()
+    view.activateWindow()
 
     _ventanas[nombre] = view
     return view
@@ -816,88 +865,82 @@ def _mover_track(path, nombre, carpeta, callback):
         callback(carpeta)
 
 
-def _abrir_popup_auto(nombre_archivo, path_archivo, callback):
+def _abrir_popup_auto(nombre_archivo, path_archivo, callback, posicion=1, total=None):
     """S50: abre el popup con bandeja integrada."""
     global _popup_auto_abierto
     _popup_auto_abierto = True
 
     ev = threading.Event()
-    _estado["carpeta"]["nombre"]    = nombre_archivo
-    _estado["carpeta"]["path"]      = path_archivo
-    _estado["carpeta"]["resultado"] = None
-    _estado["carpeta"]["evento"]    = ev
-    _estado["carpeta"]["modo"]      = "auto"
+    _estado["carpeta"]["nombre"]          = nombre_archivo
+    _estado["carpeta"]["path"]            = path_archivo
+    _estado["carpeta"]["resultado"]       = None
+    _estado["carpeta"]["evento"]          = ev
+    _estado["carpeta"]["modo"]            = "auto"
     _estado["carpeta"]["callback_actual"] = callback
+    # B03: calcular total si no se pasa
+    with _bandeja_lock:
+        n_bandeja = len(_bandeja)
+    _estado["carpeta"]["posicion"] = posicion
+    _estado["carpeta"]["total"]    = total if total is not None else (posicion + n_bandeja)
 
     crear_ventana("carpeta", 680, 580, HTML_CARPETA)
 
     def esperar():
         global _popup_auto_abierto
-        ev.wait(timeout=300)
-        carpeta = _estado["carpeta"]["resultado"]
-        # Mover el track actual
-        if carpeta is not None:
+
+        while True:
+            ev_actual = _estado["carpeta"]["evento"]
+            ev_actual.wait(timeout=300)
+            carpeta = _estado["carpeta"]["resultado"]
+            nombre  = _estado["carpeta"]["nombre"]
+            path    = _estado["carpeta"]["path"]
+            cb      = _estado["carpeta"]["callback_actual"]
+
+            # Mover el track actual
             threading.Thread(
                 target=_mover_track,
-                args=(path_archivo, nombre_archivo, carpeta, callback),
-                daemon=True
-            ).start()
-        else:
-            # Cancelado → raiz
-            threading.Thread(
-                target=_mover_track,
-                args=(path_archivo, nombre_archivo, "", callback),
+                args=(path, nombre, carpeta if carpeta is not None else "", cb),
                 daemon=True
             ).start()
 
-        # S51: verificar si quedan tracks en bandeja
-        with _bandeja_lock:
-            quedan = len(_bandeja)
-
-        if quedan > 0:
-            # Actualizar popup con el siguiente track sin cerrar
-            siguiente = None
+            # Ver si quedan tracks en bandeja
             with _bandeja_lock:
-                if _bandeja:
+                quedan = len(_bandeja)
+
+            if quedan > 0:
+                with _bandeja_lock:
                     siguiente = _bandeja.pop(0)
-            if siguiente:
                 actualizar_tray_bandeja()
+
                 # Actualizar estado con el siguiente track
                 ev2 = threading.Event()
+                pos_actual = _estado["carpeta"]["posicion"]
+                tot_actual = _estado["carpeta"]["total"]
                 _estado["carpeta"]["nombre"]          = siguiente["nombre"]
                 _estado["carpeta"]["path"]            = siguiente["path"]
                 _estado["carpeta"]["resultado"]       = None
                 _estado["carpeta"]["evento"]          = ev2
                 _estado["carpeta"]["callback_actual"] = siguiente["callback"]
+                _estado["carpeta"]["posicion"]        = pos_actual + 1
+                # total puede haber crecido si llegaron más tracks mientras tanto
+                with _bandeja_lock:
+                    nuevos = len(_bandeja)
+                _estado["carpeta"]["total"] = max(tot_actual, pos_actual + 1 + nuevos)
+
                 # Decirle al HTML que recargue
                 view = _ventanas.get("carpeta")
                 if view:
-                    port = _PUERTO
-                    encolar(lambda p=port: view.page().runJavaScript(
-                        f"if(typeof recargarBandeja==='function') recargarBandeja();"
+                    encolar(lambda v=view: v.page().runJavaScript(
+                        "if(typeof recargarBandeja==='function') recargarBandeja();"
                     ))
-                # Esperar la próxima confirmación
-                ev2.wait(timeout=300)
-                carpeta2 = _estado["carpeta"]["resultado"]
-                sig_nombre = siguiente["nombre"]
-                sig_path   = siguiente["path"]
-                sig_cb     = siguiente["callback"]
-                threading.Thread(
-                    target=_mover_track,
-                    args=(sig_path, sig_nombre, carpeta2 if carpeta2 is not None else "", sig_cb),
-                    daemon=True
-                ).start()
-                # Recursivo para los siguientes
-                with _bandeja_lock:
-                    quedan2 = len(_bandeja)
-                if quedan2 == 0:
-                    _popup_auto_abierto = False
-                    encolar(lambda: _cerrar_popup("carpeta"))
-                    actualizar_tray_bandeja()
-        else:
-            _popup_auto_abierto = False
-            encolar(lambda: _cerrar_popup("carpeta"))
-            actualizar_tray_bandeja()
+                # Continuar el loop con el siguiente track
+                continue
+            else:
+                # No quedan tracks — cerrar
+                _popup_auto_abierto = False
+                encolar(lambda: _cerrar_popup("carpeta"))
+                actualizar_tray_bandeja()
+                break
 
     threading.Thread(target=esperar, daemon=True).start()
 

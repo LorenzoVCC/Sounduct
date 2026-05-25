@@ -507,12 +507,19 @@
         if (res.nombre) {
           document.getElementById('filename').textContent = res.nombre
           trackActualIdx = -1
-          audio.src = BASE + '/carpeta/audio'
+          // B07: forzar reload del audio aunque la URL base sea la misma
+          audio.src = BASE + '/carpeta/audio?t=' + Date.now()
           audio.load()
           // Limpiar selección activa en bandeja
           document.querySelectorAll('.bandeja-item').forEach(function(el) {
             el.classList.remove('activo')
           })
+          // Reset player UI
+          document.getElementById('progress-fill').style.width = '0%'
+          document.getElementById('time-current').textContent  = '0:00'
+          document.getElementById('time-total').textContent    = '0:00'
+          document.getElementById('icon-play').style.display   = 'block'
+          document.getElementById('icon-pause').style.display  = 'none'
         }
       })
     }
@@ -536,7 +543,7 @@
           document.getElementById('btn-download').style.display  = 'none'
           document.getElementById('formato-bar').style.display   = 'none'
 
-          audio.src = BASE + '/carpeta/audio'
+          audio.src = BASE + '/carpeta/audio?t=' + Date.now()
           audio.load()
 
           api('/carpeta/nombre').then(function(r) {
