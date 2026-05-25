@@ -5,6 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sounduct - Settings</title>
   <link rel="stylesheet" href="styles/styles.css" />
+  <style>
+    .setting-select {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 4px;
+      color: #f0f0f0;
+      font-size: 12px;
+      font-family: 'Inter', sans-serif;
+      padding: 5px 10px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .setting-select:focus  { border-color: #8B53FF; }
+    .setting-select option { background: #1a1a1a; }
+  </style>
+  <style>
+    .setting-select {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 4px;
+      color: #f0f0f0;
+      font-size: 12px;
+      font-family: 'Inter', sans-serif;
+      padding: 5px 10px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .setting-select:focus { border-color: #8B53FF; }
+    .setting-select option { background: #1a1a1a; }
+  </style>
 </head>
 <body>
   <div class="popup">
@@ -50,6 +82,38 @@
 
       <div class="setting-row">
         <div class="setting-info">
+          <span class="setting-label">Navegador para cookies</span>
+          <span class="setting-desc">Usado para descargar desde YouTube sin bloqueos</span>
+        </div>
+        <div class="setting-input">
+          <select class="setting-select" id="select-navegador">
+            <option value="chrome">Chrome</option>
+            <option value="edge">Edge</option>
+            <option value="firefox">Firefox</option>
+            <option value="brave">Brave</option>
+            <option value="ninguno">Sin cookies</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Navegador para cookies</span>
+          <span class="setting-desc">Usado para descargar desde YouTube sin bloqueos</span>
+        </div>
+        <div class="setting-input">
+          <select class="setting-select" id="select-navegador">
+            <option value="edge">Edge</option>
+            <option value="chrome">Chrome</option>
+            <option value="firefox">Firefox</option>
+            <option value="brave">Brave</option>
+            <option value="ninguno">Sin cookies</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
           <span class="setting-label">Arranque automatico</span>
           <span class="setting-desc">Iniciar Sounduct al encender la PC</span>
         </div>
@@ -72,7 +136,7 @@
   <script>
     var PORT  = new URLSearchParams(location.search).get('port')
     var BASE  = 'http://127.0.0.1:' + PORT
-    var rutas = { descargas: '', biblioteca: '', pd: '', arranque_automatico: false }
+    var rutas = { descargas: '', biblioteca: '', pd: '', arranque_automatico: false, navegador: 'edge' }
     var ids   = { descargas: 'path-descargas', biblioteca: 'path-biblioteca', pd: 'path-pd' }
 
     function api(endpoint, method, body) {
@@ -90,12 +154,17 @@
         rutas.biblioteca          = cfg.biblioteca
         rutas.pd                  = cfg.pd
         rutas.arranque_automatico = cfg.arranque_automatico || false
+        rutas.navegador           = cfg.navegador || 'edge'
         document.getElementById('path-descargas').textContent  = cfg.descargas
         document.getElementById('path-biblioteca').textContent = cfg.biblioteca
         document.getElementById('path-pd').textContent         = cfg.pd
         document.getElementById('toggle-arranque').checked     = rutas.arranque_automatico
-        document.getElementById('toggle-arranque').onchange    = function() {
+        document.getElementById('select-navegador').value      = rutas.navegador
+        document.getElementById('toggle-arranque').onchange = function() {
           rutas.arranque_automatico = this.checked
+        }
+        document.getElementById('select-navegador').onchange = function() {
+          rutas.navegador = this.value
         }
       })
     })

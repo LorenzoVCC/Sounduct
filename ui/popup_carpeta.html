@@ -355,6 +355,15 @@
         var section    = document.getElementById('bandeja-section')
         var lista      = document.getElementById('bandeja-lista')
         var count      = document.getElementById('bandeja-count')
+        var label      = document.getElementById('header-label')
+
+        // B03: mostrar contador x/x en el header
+        var total = res.total || 1
+        if (total > 1) {
+          label.textContent = 'Track ' + (res.posicion || 1) + ' de ' + total
+        } else {
+          label.textContent = 'Nuevo track detectado'
+        }
 
         if (pendientes.length === 0) {
           section.style.display = 'none'

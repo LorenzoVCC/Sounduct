@@ -28,7 +28,8 @@ CONFIG_DEFAULT = {
     "carpeta_descargas":  os.path.join(os.path.expanduser("~"), "Downloads"),
     "carpeta_biblioteca": os.path.join(os.path.expanduser("~"), "Music", "Biblioteca"),
     "carpeta_pd":         "E:\\",
-    "arranque_automatico": False
+    "arranque_automatico": False,
+    "navegador": "edge"
 }
 
 def cargar_config():
@@ -54,6 +55,7 @@ def get_descargas():           return _config["carpeta_descargas"]
 def get_biblioteca():          return _config["carpeta_biblioteca"]
 def get_pd():                  return _config["carpeta_pd"]
 def get_arranque_automatico(): return _config.get("arranque_automatico", False)
+def get_navegador():           return _config.get("navegador", "edge")
 
 # ──────────────────────────────────────────────
 #  ARRANQUE AUTOMÁTICO — S28
@@ -276,7 +278,8 @@ class SoundductHandler(BaseHTTPRequestHandler):
                 "descargas":           get_descargas(),
                 "biblioteca":          get_biblioteca(),
                 "pd":                  get_pd(),
-                "arranque_automatico": get_arranque_automatico()
+                "arranque_automatico": get_arranque_automatico(),
+                "navegador":           get_navegador()
             })
 
         elif path == "/settings/ruta":
@@ -301,14 +304,47 @@ class SoundductHandler(BaseHTTPRequestHandler):
             self._json_response({"carpetas": listar_carpetas()})
 
         elif path == "/carpeta/audio":
-            # S31: sirve el archivo de audio desde Descargas
-            audio_path = _estado["carpeta"].get("path")
+            # S31/S51: sirve audio del track actual (idx=-1) o de uno de la bandeja (idx>=0)
+            qs  = parse_qs(urlparse(self.path).query)
+            idx = int(qs.get("idx", ["-1"])[0])
+            if idx == -1:
+                audio_path = _estado["carpeta"].get("path")
+            else:
+                with _bandeja_lock:
+                    if 0 <= idx < len(_bandeja):
+                        audio_path = _bandeja[idx]["path"]
+                    else:
+                        audio_path = None
             if not audio_path or not os.path.exists(audio_path):
                 self.send_response(404)
                 self.end_headers()
                 return
-            ext  = os.path.splitext(audio_path)[1].lower()
-            mime = {'.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.aiff': 'audio/aiff'}.get(ext, 'audio/mpeg')
+            ext = os.path.splitext(audio_path)[1].lower()
+
+            # QWebEngineView/Chromium no soporta AIFF — transcodificar a WAV con ffmpeg al vuelo
+            if ext in ('.aiff', '.aif'):
+                import subprocess
+                try:
+                    proc = subprocess.Popen(
+                        ["ffmpeg", "-i", audio_path, "-f", "wav", "-acodec", "pcm_s16le", "pipe:1", "-loglevel", "quiet"],
+                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
+                    )
+                    audio_data = proc.stdout.read()
+                    proc.wait()
+                    self.send_response(200)
+                    self._cors()
+                    self.send_header("Content-Type", "audio/wav")
+                    self.send_header("Content-Length", str(len(audio_data)))
+                    self.send_header("Accept-Ranges", "bytes")
+                    self.end_headers()
+                    self.wfile.write(audio_data)
+                except Exception as e:
+                    print(f"[ERROR] ffmpeg transcodificando AIFF: {e}")
+                    self.send_response(500)
+                    self.end_headers()
+                return
+
+            mime = {'.mp3': 'audio/mpeg', '.wav': 'audio/wav'}.get(ext, 'audio/mpeg')
             size = os.path.getsize(audio_path)
             self.send_response(200)
             self._cors()
@@ -352,35 +388,6 @@ class SoundductHandler(BaseHTTPRequestHandler):
                 "posicion":   1,        # el actual siempre es el 1
                 "total":      total
             })
-
-        elif path == "/carpeta/audio":
-            # Sirve audio — puede ser del track actual o de uno de la bandeja
-            qs    = parse_qs(urlparse(self.path).query)
-            idx   = int(qs.get("idx", ["-1"])[0])
-            if idx == -1:
-                audio_path = _estado["carpeta"].get("path")
-            else:
-                with _bandeja_lock:
-                    if 0 <= idx < len(_bandeja):
-                        audio_path = _bandeja[idx]["path"]
-                    else:
-                        audio_path = None
-            if not audio_path or not os.path.exists(audio_path):
-                self.send_response(404)
-                self.end_headers()
-                return
-            ext  = os.path.splitext(audio_path)[1].lower()
-            mime = {'.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.aiff': 'audio/aiff'}.get(ext, 'audio/mpeg')
-            size = os.path.getsize(audio_path)
-            self.send_response(200)
-            self._cors()
-            self.send_header("Content-Type", mime)
-            self.send_header("Content-Length", str(size))
-            self.send_header("Accept-Ranges", "bytes")
-            self.end_headers()
-            with open(audio_path, 'rb') as f:
-                self.wfile.write(f.read())
-            return
 
         elif path == "/carpeta/esperar":
             # Bloquea hasta que el usuario confirme o cancele
@@ -428,6 +435,7 @@ class SoundductHandler(BaseHTTPRequestHandler):
             _config["carpeta_biblioteca"]  = data.get("biblioteca",          get_biblioteca())
             _config["carpeta_pd"]          = data.get("pd",                  get_pd())
             _config["arranque_automatico"] = data.get("arranque_automatico", get_arranque_automatico())
+            _config["navegador"]           = data.get("navegador",           get_navegador())
             guardar_config(_config)
             set_arranque_automatico(_config["arranque_automatico"])
             # S34: crear carpetas al guardar (no al arrancar watchers)
@@ -617,29 +625,40 @@ def abrir_popup_settings(callback=None):
 # ──────────────────────────────────────────────
 #  DESCARGA DESDE URL — Épica 9
 # ──────────────────────────────────────────────
-def _get_cookies_file():
-    """Copia el archivo de cookies de Chrome a un temp para evitar bloqueo mientras Chrome esta abierto."""
-    import shutil as _shutil
-    import tempfile
-    base = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Google", "Chrome", "User Data")
-    cookies_path = None
-    for perfil in ["Default", "Profile 1", "Profile 2", "Profile 3"]:
-        candidate = os.path.join(base, perfil, "Cookies")
-        if os.path.exists(candidate):
-            cookies_path = candidate
-            break
-    if not cookies_path:
-        print("[COOKIES] No se encontro base de cookies de Chrome")
-        return None
-    try:
-        tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-        tmp.close()
-        _shutil.copy2(cookies_path, tmp.name)
-        print(f"[COOKIES] Cookies copiadas de: {cookies_path}")
-        return tmp.name
-    except Exception as e:
-        print(f"[COOKIES] No se pudo copiar: {e}")
-        return None
+def _get_cookies_args():
+    """S55/S56: devuelve args de cookies para yt-dlp según el navegador configurado.
+    Chrome requiere copia manual del SQLite porque lo bloquea mientras está abierto.
+    Edge, Firefox y Brave usan --cookies-from-browser directamente."""
+    navegador = get_navegador()
+    if navegador == "ninguno":
+        print("[COOKIES] Sin cookies configuradas")
+        return [], None
+
+    if navegador == "chrome":
+        import shutil as _shutil, tempfile
+        base = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Google", "Chrome", "User Data")
+        cookies_path = None
+        for perfil in ["Default", "Profile 1", "Profile 2", "Profile 3"]:
+            candidate = os.path.join(base, perfil, "Cookies")
+            if os.path.exists(candidate):
+                cookies_path = candidate
+                break
+        if not cookies_path:
+            print("[COOKIES] No se encontro base de cookies de Chrome, intentando --cookies-from-browser")
+            return ["--cookies-from-browser", "chrome"], None
+        try:
+            tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+            tmp.close()
+            _shutil.copy2(cookies_path, tmp.name)
+            print(f"[COOKIES] Chrome: cookies copiadas a temp")
+            return ["--cookies", tmp.name], tmp.name
+        except Exception as e:
+            print(f"[COOKIES] Chrome: no se pudo copiar ({e}), intentando --cookies-from-browser")
+            return ["--cookies-from-browser", "chrome"], None
+
+    # Edge, Firefox, Brave: --cookies-from-browser funciona sin bloqueo
+    print(f"[COOKIES] Usando cookies de: {navegador}")
+    return ["--cookies-from-browser", navegador], None
 
 
 def _limpiar_url(url):
@@ -674,25 +693,30 @@ def _descargar_url(url, carpeta, formato="mp3"):
         destino = os.path.join(get_biblioteca(), carpeta)
     os.makedirs(destino, exist_ok=True)
 
-    # Usar sys.executable para garantizar que encuentra yt-dlp
-    # independientemente del PATH del sistema
-    cookies_file = _get_cookies_file()
+    cookies_args, cookies_file = _get_cookies_args()
 
-    cmd = [
-        sys.executable, "-m", "yt_dlp",
-        "--extract-audio",
-        "--audio-format", formato,
-        "--audio-quality", "0",
-        "--no-playlist",
-        "--output", os.path.join(destino, "%(title)s.%(ext)s"),
-        "--newline",
-        url
-    ]
-    if cookies_file:
-        cmd.extend(["--cookies", cookies_file])
-        print(f"[COOKIES] Usando cookies de Chrome: {cookies_file}")
+    # S46: yt-dlp no acepta "aiff" en --audio-format, hay que extraer como wav y remuxear
+    if formato == "aiff":
+        cmd = [
+            sys.executable, "-m", "yt_dlp",
+            "--extract-audio",
+            "--audio-format", "wav",
+            "--remux-video", "aiff",
+            "--audio-quality", "0",
+            "--no-playlist",
+            "--output", os.path.join(destino, "%(title)s.%(ext)s"),
+            "--newline",
+        ] + cookies_args + [url]
     else:
-        print("[COOKIES] Sin cookies, descargando sin autenticacion")
+        cmd = [
+            sys.executable, "-m", "yt_dlp",
+            "--extract-audio",
+            "--audio-format", formato,
+            "--audio-quality", "0",
+            "--no-playlist",
+            "--output", os.path.join(destino, "%(title)s.%(ext)s"),
+            "--newline",
+        ] + cookies_args + [url]
 
     print(f"[DESCARGA] {url} → {destino}")
     try:
@@ -718,8 +742,10 @@ def _descargar_url(url, carpeta, formato="mp3"):
             # Detectar archivo final
             if "[ExtractAudio] Destination:" in line:
                 archivo_final = line.split("Destination:")[-1].strip()
-            elif "Destination:" in line and line.endswith(".mp3"):
-                archivo_final = line.split("Destination:")[-1].strip()
+            elif "Destination:" in line:
+                candidate = line.split("Destination:")[-1].strip()
+                if any(candidate.lower().endswith(ext) for ext in ('.mp3', '.wav', '.aiff', '.aif', '.m4a')):
+                    archivo_final = candidate
 
         proc.wait()
         if proc.returncode == 0:
@@ -897,6 +923,14 @@ def abrir_popup_carpeta(nombre_archivo, path_archivo, callback, modo="auto"):
         if modo == "manual":
             global _popup_manual_abierto
             _popup_manual_abierto = False
+            # Drenar bandeja si quedaron tracks encolados mientras estaba el popup manual
+            with _bandeja_lock:
+                quedan = len(_bandeja)
+            if quedan > 0:
+                with _bandeja_lock:
+                    siguiente = _bandeja.pop(0)
+                actualizar_tray_bandeja()
+                encolar(lambda s=siguiente: _abrir_popup_auto(s["nombre"], s["path"], s["callback"]))
         callback(carpeta)
 
     threading.Thread(target=esperar, daemon=True).start()
@@ -993,9 +1027,13 @@ def procesar_archivo_nuevo(path):
         done.wait()
         return
 
-    # Si popup manual abierto, encolar también
+    # Si popup manual abierto, encolar solo si hay una descarga activa
     if _popup_manual_abierto:
-        print(f"[BANDEJA] Popup manual abierto, encolando: {nombre}")
+        descarga_activa = _estado["carpeta"]["descarga"]["activa"]
+        if descarga_activa:
+            print(f"[BANDEJA] Descarga en curso, encolando: {nombre}")
+        else:
+            print(f"[BANDEJA] Popup manual idle, encolando para procesar al cerrar: {nombre}")
         with _bandeja_lock:
             _bandeja.append({"nombre": nombre, "path": path, "callback": callback})
         actualizar_tray_bandeja()
@@ -1005,40 +1043,6 @@ def procesar_archivo_nuevo(path):
     # S48: primer track — abrir popup directamente
     encolar(lambda: _abrir_popup_auto(nombre, path, callback))
     done.wait()
-
-    carpeta = resultado[0]
-    if carpeta is None:
-        destino_raiz = os.path.join(get_biblioteca(), nombre)
-        try:
-            os.makedirs(get_biblioteca(), exist_ok=True)
-            shutil.move(path, destino_raiz)
-            print(f"[CANCELADO] Movido a raiz: {nombre}")
-        except Exception as e:
-            print(f"[ERROR] Moviendo a raiz: {e}")
-        return
-
-    if carpeta == "/ Raiz":
-        destino_local = os.path.join(get_biblioteca(), nombre)
-        rel           = nombre
-    else:
-        destino_local = os.path.join(get_biblioteca(), carpeta, nombre)
-        rel           = os.path.join(carpeta, nombre)
-
-    if os.path.abspath(path) != os.path.abspath(destino_local):
-        try:
-            os.makedirs(os.path.dirname(destino_local), exist_ok=True)
-            shutil.move(path, destino_local)
-            print(f"[LOCAL] Movido a: {rel}")
-        except Exception as e:
-            encolar(lambda: notificar("Sounduct — Error", f"Error al mover {nombre}", critico=True))
-            return
-
-    if pd_conectado():
-        try:
-            pd_copy(rel)
-            encolar(lambda n=nombre: notificar("Sounduct", f"{n} copiado al PD"))
-        except Exception as e:
-            encolar(lambda: notificar("Sounduct — Error", f"Error al copiar al PD: {nombre}", critico=True))
 
 # ──────────────────────────────────────────────
 #  WATCHERS
