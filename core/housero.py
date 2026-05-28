@@ -530,24 +530,34 @@ class SoundductHandler(BaseHTTPRequestHandler):
             idx     = data.get("idx", -1)
 
             if idx == -1:
-                # Confirmar track actual (comportamiento original)
+                # Confirmar track actual
                 _estado["carpeta"]["resultado"] = carpeta
                 ev = _estado["carpeta"]["evento"]
                 if ev: ev.set()
             else:
-                # S52: confirmar track de la bandeja por índice
+                # S52: el usuario confirmó un track de la bandeja
+                # Intercambiarlo con el activo para mantener el flujo del loop
                 with _bandeja_lock:
                     if 0 <= idx < len(_bandeja):
-                        track = _bandeja.pop(idx)
-                    else:
-                        track = None
-                if track:
-                    actualizar_tray_bandeja()
-                    threading.Thread(
-                        target=_mover_track,
-                        args=(track["path"], track["nombre"], carpeta, track["callback"]),
-                        daemon=True
-                    ).start()
+                        track_cola = _bandeja[idx]
+                        # Guardar el activo actual
+                        activo_nombre = _estado["carpeta"]["nombre"]
+                        activo_path   = _estado["carpeta"]["path"]
+                        activo_cb     = _estado["carpeta"]["callback_actual"]
+                        # Poner el activo en el lugar del track de cola
+                        _bandeja[idx] = {
+                            "nombre":   activo_nombre,
+                            "path":     activo_path,
+                            "callback": activo_cb
+                        }
+                        # El track de cola pasa a ser el activo
+                        _estado["carpeta"]["nombre"]          = track_cola["nombre"]
+                        _estado["carpeta"]["path"]            = track_cola["path"]
+                        _estado["carpeta"]["callback_actual"] = track_cola["callback"]
+                # Confirmar el nuevo activo (que es el track de cola elegido)
+                _estado["carpeta"]["resultado"] = carpeta
+                ev = _estado["carpeta"]["evento"]
+                if ev: ev.set()
 
             self._json_response({"ok": True})
 

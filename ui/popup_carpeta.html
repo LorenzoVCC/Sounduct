@@ -374,6 +374,31 @@
         count.textContent     = pendientes.length
         lista.innerHTML       = ''
 
+        // B10: agregar el track activo como primer ítem con estilo propio
+        var nombreActivo = document.getElementById('filename').textContent
+        var itemActivo   = document.createElement('div')
+        itemActivo.className = 'bandeja-item activo'
+        itemActivo.id        = 'bandeja-item-activo'
+        itemActivo.innerHTML = '<span class="track-num" style="color:#8B53FF;">▶</span>' +
+                               '<span class="track-nombre">' + nombreActivo + '</span>'
+        itemActivo.addEventListener('click', function() {
+          trackActualIdx = -1
+          detenerAudio()
+          document.getElementById('filename').textContent = nombreActivo
+          document.querySelectorAll('.bandeja-item').forEach(function(el) {
+            el.classList.remove('activo')
+          })
+          itemActivo.classList.add('activo')
+          audio.src = BASE + '/carpeta/audio?t=' + Date.now()
+          audio.load()
+          // Reset player UI
+          document.getElementById('progress-fill').style.width = '0%'
+          document.getElementById('time-current').textContent  = '0:00'
+          document.getElementById('icon-play').style.display   = 'block'
+          document.getElementById('icon-pause').style.display  = 'none'
+        })
+        lista.appendChild(itemActivo)
+
         pendientes.forEach(function(t) {
           var item = document.createElement('div')
           item.className = 'bandeja-item'
@@ -395,14 +420,22 @@
       // Actualizar header
       document.getElementById('filename').textContent = nombre
 
-      // Actualizar ícono activo en bandeja
+      // Actualizar ícono activo en bandeja — desmarcar activo, marcar el seleccionado
+      var itemActivo = document.getElementById('bandeja-item-activo')
+      if (itemActivo) itemActivo.classList.remove('activo')
       document.querySelectorAll('.bandeja-item').forEach(function(el, i) {
-        el.classList.toggle('activo', i === idx)
+        // i=0 es el activo, los pendientes empiezan en i=1
+        if (i > 0) el.classList.toggle('activo', i - 1 === idx)
       })
 
       // Cargar audio de ese track
       audio.src = BASE + '/carpeta/audio?idx=' + idx
       audio.load()
+      // Reset player UI
+      document.getElementById('progress-fill').style.width = '0%'
+      document.getElementById('time-current').textContent  = '0:00'
+      document.getElementById('icon-play').style.display   = 'block'
+      document.getElementById('icon-pause').style.display  = 'none'
     }
 
     // S42: descarga
@@ -550,8 +583,9 @@
             document.getElementById('filename').textContent = r.nombre || ''
           })
 
-          // S50: cargar bandeja inicial
+          // S50: cargar bandeja inicial + polling cada 2s para actualizaciones en tiempo real (B11)
           cargarBandeja()
+          setInterval(cargarBandeja, 2000)
         }
       })
 
