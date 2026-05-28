@@ -6,75 +6,125 @@
   <title>Sounduct</title>
   <link rel="stylesheet" href="styles/styles.css" />
   <style>
-    /* ── BANDEJA DE TRACKS ── */
-    .bandeja {
-      background: #0d0d0d;
-      border-bottom: 1px solid #2a2a2a;
-      max-height: 100px;
-      overflow-y: auto;
+    /* ── LAYOUT PRINCIPAL S63 ── */
+    .popup {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: #0f0f0f;
     }
 
-    .bandeja::-webkit-scrollbar       { width: 3px; }
-    .bandeja::-webkit-scrollbar-track { background: #0d0d0d; }
-    .bandeja::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+    /* ── HEADER ── */
+    .header {
+      flex-shrink: 0;
+      background: #161616;
+      border-bottom: 1px solid #2a2a2a;
+      padding: 14px 20px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
 
-    .bandeja-item {
+    .header .label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #8B53FF;
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* URL BAR */
+    .url-bar {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 8px 24px;
-      font-size: 12px;
-      color: #666;
-      cursor: pointer;
-      border-bottom: 1px solid #181818;
-      transition: background 0.1s, color 0.1s;
-      user-select: none;
+      gap: 8px;
+      padding: 8px 20px;
+      background: #111;
+      border-bottom: 1px solid #1e1e1e;
+      flex-shrink: 0;
     }
 
-    .bandeja-item:hover { background: #161616; color: #aaa; }
-
-    .bandeja-item.activo {
-      background: #161616;
-      color: #f0f0f0;
-      border-left: 2px solid #8B53FF;
-      padding-left: 22px;
-    }
-
-    .bandeja-item .track-num {
-      font-size: 10px;
-      color: #8B53FF;
-      font-weight: 700;
-      min-width: 16px;
-    }
-
-    .bandeja-item .track-nombre {
+    .url-input {
       flex: 1;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 4px;
+      padding: 6px 10px;
+      color: #f0f0f0;
+      font-size: 12px;
+      font-family: 'Consolas', monospace;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .url-input:focus        { border-color: #8B53FF; }
+    .url-input::placeholder { color: #444; }
+    .url-input:disabled     { opacity: 0.3; cursor: not-allowed; }
+
+    .btn-download {
+      flex-shrink: 0;
+      padding: 6px 14px;
+      background: #8B53FF;
+      border: none;
+      border-radius: 4px;
+      color: #0f0f0f;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-download:hover    { background: #a78bfa; }
+    .btn-download:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── TRACK INFO BAR ── */
+    .track-info-bar {
+      display: flex;
+      align-items: center;
+      padding: 8px 20px;
+      background: #111;
+      border-bottom: 1px solid #1e1e1e;
+      flex-shrink: 0;
+      min-height: 36px;
+      gap: 0;
+    }
+
+    .track-index {
+      font-size: 10px;
+      font-weight: 600;
+      color: #8B53FF;
+      letter-spacing: 1px;
+      min-width: 52px;
+      flex-shrink: 0;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .track-title {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 500;
+      color: #f0f0f0;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      padding: 0 12px;
+      border-left: 1px solid #2a2a2a;
+      border-right: 1px solid #2a2a2a;
+      font-family: 'Inter', sans-serif;
     }
 
-    .bandeja-header {
-      display: flex;
-      align-items: center;
-      padding: 6px 24px;
-      background: #0a0a0a;
-      border-bottom: 1px solid #1a1a1a;
-    }
-
-    .bandeja-header .label {
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: #444;
-      flex: 1;
-    }
-
-    .bandeja-count {
+    .track-format {
       font-size: 10px;
-      color: #8B53FF;
-      font-weight: 700;
+      font-weight: 600;
+      color: #555;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      min-width: 52px;
+      text-align: right;
+      flex-shrink: 0;
+      font-family: 'Inter', sans-serif;
     }
 
     /* ── PLAYER ── */
@@ -82,15 +132,16 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 12px 24px;
+      padding: 10px 20px;
       background: #161616;
       border-bottom: 1px solid #2a2a2a;
+      flex-shrink: 0;
     }
 
     .btn-play {
       flex-shrink: 0;
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       background: #8B53FF;
       border: none;
       border-radius: 50%;
@@ -101,16 +152,15 @@
       transition: background 0.15s, transform 0.1s;
       padding: 0;
     }
-
     .btn-play:hover  { background: #a78bfa; transform: scale(1.05); }
     .btn-play:active { transform: scale(0.97); }
-    .btn-play svg    { width: 14px; height: 14px; fill: #0f0f0f; }
+    .btn-play svg    { width: 12px; height: 12px; fill: #0f0f0f; }
 
     .player-bar {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
     }
 
     .progress-track {
@@ -139,60 +189,15 @@
       font-family: 'Consolas', monospace;
     }
 
-    /* ── URL BAR ── */
-    .url-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 24px;
-      background: #111;
-      border-bottom: 1px solid #1e1e1e;
-    }
-
-    .url-input {
-      flex: 1;
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      border-radius: 4px;
-      padding: 6px 10px;
-      color: #f0f0f0;
-      font-size: 12px;
-      font-family: 'Consolas', monospace;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-
-    .url-input:focus        { border-color: #8B53FF; }
-    .url-input::placeholder { color: #444; }
-    .url-input:disabled     { opacity: 0.3; cursor: not-allowed; }
-
-    .btn-download {
-      flex-shrink: 0;
-      padding: 6px 14px;
-      background: #8B53FF;
-      border: none;
-      border-radius: 4px;
-      color: #0f0f0f;
-      font-size: 11px;
-      font-weight: 700;
-      font-family: 'Inter', sans-serif;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-
-    .btn-download:hover    { background: #a78bfa; }
-    .btn-download:disabled { opacity: 0.4; cursor: not-allowed; }
-
     /* ── FORMATO ── */
     .formato-bar {
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 24px;
+      padding: 7px 20px;
       background: #111;
       border-bottom: 1px solid #1e1e1e;
+      flex-shrink: 0;
     }
 
     .formato-label {
@@ -216,13 +221,12 @@
       cursor: pointer;
       transition: all 0.15s;
     }
-
     .btn-formato:hover  { border-color: #444; color: #aaa; }
     .btn-formato.active { background: #1a1a1a; border-color: #8B53FF; color: #8B53FF; }
 
     /* ── DESCARGA STATUS ── */
     .download-status {
-      padding: 8px 24px;
+      padding: 7px 20px;
       font-size: 11px;
       color: #888;
       font-family: 'Consolas', monospace;
@@ -232,32 +236,213 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      flex-shrink: 0;
     }
-
     .download-status.error { color: #f87171; }
     .download-status.ok    { color: #4ade80; }
 
-    .download-progress-bar  { height: 2px; background: #2a2a2a; display: none; }
+    .download-progress-bar  { height: 2px; background: #2a2a2a; display: none; flex-shrink: 0; }
     .download-progress-fill { height: 100%; background: #8B53FF; width: 0%; transition: width 0.2s ease; }
+
+    /* ── BODY: DOS COLUMNAS ── */
+    .body-columns {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* Columna izquierda: tracks */
+    .col-tracks {
+      width: 45%;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #1e1e1e;
+      overflow: hidden;
+    }
+
+    .col-header {
+      display: flex;
+      align-items: center;
+      padding: 7px 16px;
+      background: #0a0a0a;
+      border-bottom: 1px solid #1a1a1a;
+      flex-shrink: 0;
+    }
+
+    .col-header .label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #555;
+      flex: 1;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .bandeja-count {
+      font-size: 10px;
+      color: #8B53FF;
+      font-weight: 700;
+    }
+
+    .bandeja {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .bandeja::-webkit-scrollbar       { width: 3px; }
+    .bandeja::-webkit-scrollbar-track { background: #0d0d0d; }
+    .bandeja::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+
+    .bandeja-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 16px;
+      font-size: 12px;
+      color: #666;
+      cursor: pointer;
+      border-bottom: 1px solid #181818;
+      transition: background 0.1s, color 0.1s;
+      user-select: none;
+    }
+    .bandeja-item:hover { background: #161616; color: #aaa; }
+    .bandeja-item.activo {
+      background: #161616;
+      color: #f0f0f0;
+      border-left: 2px solid #8B53FF;
+      padding-left: 14px;
+    }
+
+    .bandeja-item .track-num {
+      font-size: 10px;
+      color: #8B53FF;
+      font-weight: 700;
+      min-width: 14px;
+      flex-shrink: 0;
+    }
+
+    .bandeja-item .track-nombre {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Placeholder cuando no hay tracks en cola */
+    .bandeja-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #333;
+      font-style: italic;
+    }
+
+    /* Columna derecha: carpetas */
+    .col-carpetas {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .folder-list {
+      list-style: none;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .folder-list::-webkit-scrollbar       { width: 4px; }
+    .folder-list::-webkit-scrollbar-track { background: #0f0f0f; }
+    .folder-list::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+
+    .folder-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 400;
+      color: #c0c0c0;
+      border-bottom: 1px solid #181818;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      user-select: none;
+    }
+    .folder-item::before {
+      content: '';
+      display: inline-block;
+      width: 13px;
+      height: 10px;
+      background: #2a2a2a;
+      border-radius: 2px 4px 2px 2px;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .folder-item:hover             { background: #1a1a1a; color: #f0f0f0; }
+    .folder-item:hover::before     { background: #8B53FF; }
+    .folder-item.selected          { background: #1c1c1c; color: #f0f0f0; border-left: 2px solid #8B53FF; padding-left: 14px; }
+    .folder-item.selected::before  { background: #8B53FF; }
+
+    /* ── ACTIONS ── */
+    .actions {
+      display: flex;
+      gap: 10px;
+      padding: 12px 20px;
+      background: #111;
+      border-top: 1px solid #1e1e1e;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 9px 0;
+      border-radius: 6px;
+      border: 1px solid #2a2a2a;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .btn-cancel {
+      background: transparent;
+      color: #555;
+      border-color: #222;
+    }
+
+    .btn-cancel:hover {
+      background: #1a1a1a;
+      color: #888;
+      border-color: #333;
+    }
+
+    .btn-confirm {
+      background: #8B53FF;
+      color: #0f0f0f;
+      border-color: #8B53FF;
+    }
+
+    .btn-confirm:hover {
+      background: #a78bfa;
+      border-color: #a78bfa;
+    }
   </style>
 </head>
 <body>
   <div class="popup">
+
+    <!-- HEADER -->
     <div class="header">
       <span class="label" id="header-label">Nuevo track detectado</span>
-      <h1 class="filename" id="filename">Cargando...</h1>
     </div>
 
-    <!-- BANDEJA DE TRACKS PENDIENTES (solo modo auto con múltiples tracks) -->
-    <div id="bandeja-section" style="display:none;">
-      <div class="bandeja-header">
-        <span class="label">En cola</span>
-        <span class="bandeja-count" id="bandeja-count">0</span>
-      </div>
-      <div class="bandeja" id="bandeja-lista"></div>
-    </div>
-
-    <!-- URL BAR (modo manual) -->
+    <!-- URL BAR -->
     <div class="url-bar" id="url-bar-section">
       <input class="url-input" id="url-input" type="text"
         placeholder="Pegar URL de YouTube, SoundCloud, Bandcamp..."
@@ -267,24 +452,17 @@
       </button>
     </div>
 
-    <!-- FORMATO (modo manual) -->
-    <div class="formato-bar" id="formato-bar" style="display:none;">
-      <span class="formato-label">Formato</span>
-      <button class="btn-formato active" id="fmt-mp3"  onclick="setFormato('mp3')">MP3</button>
-      <button class="btn-formato"        id="fmt-wav"  onclick="setFormato('wav')">WAV</button>
-      <button class="btn-formato"        id="fmt-aiff" onclick="setFormato('aiff')">AIFF</button>
-    </div>
-
-    <!-- ESTADO DESCARGA -->
-    <div class="download-status" id="download-status"></div>
-    <div class="download-progress-bar" id="download-progress-bar">
-      <div class="download-progress-fill" id="download-progress-fill"></div>
+    <!-- TRACK INFO BAR -->
+    <div class="track-info-bar" id="track-info-bar">
+      <span class="track-index" id="track-index"></span>
+      <span class="track-title" id="filename">Cargando...</span>
+      <span class="track-format" id="track-format"></span>
     </div>
 
     <!-- PLAYER -->
     <div class="player" id="player-section">
       <button class="btn-play" id="btn-play" onclick="togglePlay()">
-        <svg id="icon-play" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg id="icon-play"  viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
         <svg id="icon-pause" viewBox="0 0 24 24" style="display:none;"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>
       </button>
       <div class="player-bar">
@@ -298,13 +476,47 @@
       </div>
     </div>
 
-    <div class="section">
-      <span class="label">Carpeta destino</span>
-      <ul class="folder-list" id="folder-list"></ul>
+    <!-- FORMATO -->
+    <div class="formato-bar" id="formato-bar" style="display:none;">
+      <span class="formato-label">Formato</span>
+      <button class="btn-formato active" id="fmt-mp3"  onclick="setFormato('mp3')">MP3</button>
+      <button class="btn-formato"        id="fmt-wav"  onclick="setFormato('wav')">WAV</button>
+      <button class="btn-formato"        id="fmt-aiff" onclick="setFormato('aiff')">AIFF</button>
     </div>
 
+    <!-- DESCARGA STATUS -->
+    <div class="download-status" id="download-status"></div>
+    <div class="download-progress-bar" id="download-progress-bar">
+      <div class="download-progress-fill" id="download-progress-fill"></div>
+    </div>
+
+    <!-- BODY: DOS COLUMNAS -->
+    <div class="body-columns">
+
+      <!-- COLUMNA IZQUIERDA: TRACKS -->
+      <div class="col-tracks">
+        <div class="col-header">
+          <span class="label">En cola</span>
+          <span class="bandeja-count" id="bandeja-count"></span>
+        </div>
+        <div class="bandeja" id="bandeja-lista">
+          <div class="bandeja-empty" id="bandeja-empty">Sin tracks en cola</div>
+        </div>
+      </div>
+
+      <!-- COLUMNA DERECHA: CARPETAS -->
+      <div class="col-carpetas">
+        <div class="col-header">
+          <span class="label">Carpeta destino</span>
+        </div>
+        <ul class="folder-list" id="folder-list"></ul>
+      </div>
+
+    </div>
+
+    <!-- ACTIONS -->
     <div class="actions">
-      <button class="btn btn-cancel" onclick="cancelar()">Cancelar</button>
+      <button class="btn btn-cancel"  onclick="cancelar()">Cancelar</button>
       <button class="btn btn-confirm" id="btn-confirmar" onclick="confirmar()">Confirmar</button>
     </div>
   </div>
@@ -317,7 +529,8 @@
     var audio   = document.getElementById('audio')
     var modo    = 'auto'
     var formato = 'mp3'
-    var trackActualIdx = -1   // -1 = track del estado, >= 0 = índice en bandeja
+    var trackActualIdx  = -1
+    var nombreTrackReal = ''
 
     function api(endpoint, method, body) {
       return fetch(BASE + endpoint, {
@@ -329,142 +542,149 @@
 
     function formatTime(s) {
       if (isNaN(s)) return '0:00'
-      var m = Math.floor(s / 60)
-      var sec = Math.floor(s % 60)
+      var m = Math.floor(s / 60), sec = Math.floor(s % 60)
       return m + ':' + (sec < 10 ? '0' : '') + sec
     }
 
-    // S46: cambiar formato
     function setFormato(f) {
       formato = f
       document.querySelectorAll('.btn-formato').forEach(function(b) { b.classList.remove('active') })
       document.getElementById('fmt-' + f).classList.add('active')
+      document.getElementById('track-format').textContent = f.toUpperCase()
     }
 
-    // S39: habilitar botón cuando hay URL
     function onUrlChange() {
       if (modo !== 'manual') return
       var url = document.getElementById('url-input').value.trim()
       document.getElementById('btn-download').disabled = !url
     }
 
-    // S50: cargar bandeja de tracks
+    // ── BANDEJA ──
     function cargarBandeja() {
       api('/carpeta/bandeja').then(function(res) {
         var pendientes = res.pendientes || []
-        var section    = document.getElementById('bandeja-section')
         var lista      = document.getElementById('bandeja-lista')
         var count      = document.getElementById('bandeja-count')
         var label      = document.getElementById('header-label')
+        var empty      = document.getElementById('bandeja-empty')
+        var trackIdx   = document.getElementById('track-index')
 
-        // B03: mostrar contador x/x en el header
+        // B03: contador x/x
         var total = res.total || 1
         if (total > 1) {
-          label.textContent = 'Track ' + (res.posicion || 1) + ' de ' + total
+          label.textContent    = 'Track ' + (res.posicion || 1) + ' de ' + total
+          trackIdx.textContent = (res.posicion || 1) + '/' + total
         } else {
-          label.textContent = 'Nuevo track detectado'
+          label.textContent    = 'Nuevo track detectado'
+          trackIdx.textContent = ''
         }
 
-        if (pendientes.length === 0) {
-          section.style.display = 'none'
-          return
-        }
+        // Reconstruir lista
+        lista.innerHTML = ''
 
-        section.style.display = 'block'
-        count.textContent     = pendientes.length
-        lista.innerHTML       = ''
-
-        // B10: agregar el track activo como primer ítem con estilo propio
-        var nombreActivo = document.getElementById('filename').textContent
-        var itemActivo   = document.createElement('div')
+        // Track activo siempre primero
+        var itemActivo = document.createElement('div')
         itemActivo.className = 'bandeja-item activo'
         itemActivo.id        = 'bandeja-item-activo'
-        itemActivo.innerHTML = '<span class="track-num" style="color:#8B53FF;">▶</span>' +
-                               '<span class="track-nombre">' + nombreActivo + '</span>'
+        itemActivo.innerHTML = '<span class="track-num">▶</span>' +
+                               '<span class="track-nombre">' + nombreTrackReal + '</span>'
         itemActivo.addEventListener('click', function() {
           trackActualIdx = -1
           detenerAudio()
-          document.getElementById('filename').textContent = nombreActivo
-          document.querySelectorAll('.bandeja-item').forEach(function(el) {
-            el.classList.remove('activo')
-          })
+          document.getElementById('filename').textContent = nombreTrackReal
+          document.querySelectorAll('.bandeja-item').forEach(function(el) { el.classList.remove('activo') })
           itemActivo.classList.add('activo')
           audio.src = BASE + '/carpeta/audio?t=' + Date.now()
           audio.load()
-          // Reset player UI
-          document.getElementById('progress-fill').style.width = '0%'
-          document.getElementById('time-current').textContent  = '0:00'
-          document.getElementById('icon-play').style.display   = 'block'
-          document.getElementById('icon-pause').style.display  = 'none'
+          resetPlayerUI()
         })
         lista.appendChild(itemActivo)
 
-        pendientes.forEach(function(t) {
-          var item = document.createElement('div')
-          item.className = 'bandeja-item'
-          item.innerHTML = '<span class="track-num">' + (t.idx + 1) + '</span>' +
-                           '<span class="track-nombre">' + t.nombre + '</span>'
-          item.addEventListener('click', function() {
-            seleccionarDeBandeja(t.idx, t.nombre)
+        if (pendientes.length === 0) {
+          count.textContent = ''
+          var sep = document.createElement('div')
+          sep.className   = 'bandeja-empty'
+          sep.id          = 'bandeja-empty'
+          sep.textContent = 'Sin tracks en cola'
+          lista.appendChild(sep)
+        } else {
+          count.textContent = pendientes.length
+          pendientes.forEach(function(t) {
+            var item = document.createElement('div')
+            item.className = 'bandeja-item'
+            item.innerHTML = '<span class="track-num">' + (t.idx + 1) + '</span>' +
+                             '<span class="track-nombre">' + t.nombre + '</span>'
+            item.addEventListener('click', function() { seleccionarDeBandeja(t.idx, t.nombre) })
+            lista.appendChild(item)
           })
-          lista.appendChild(item)
-        })
+        }
+
+        // Restaurar selección si hay un track de cola seleccionado
+        if (trackActualIdx >= 0) {
+          var items = lista.querySelectorAll('.bandeja-item')
+          // items[0] = activo, items[trackActualIdx+1] = el seleccionado
+          if (items[trackActualIdx + 1]) {
+            items[0].classList.remove('activo')
+            items[trackActualIdx + 1].classList.add('activo')
+          }
+        }
       })
     }
 
-    // S51: seleccionar un track de la bandeja
     function seleccionarDeBandeja(idx, nombre) {
       trackActualIdx = idx
       detenerAudio()
-
-      // Actualizar header
       document.getElementById('filename').textContent = nombre
-
-      // Actualizar ícono activo en bandeja — desmarcar activo, marcar el seleccionado
-      var itemActivo = document.getElementById('bandeja-item-activo')
-      if (itemActivo) itemActivo.classList.remove('activo')
       document.querySelectorAll('.bandeja-item').forEach(function(el, i) {
-        // i=0 es el activo, los pendientes empiezan en i=1
-        if (i > 0) el.classList.toggle('activo', i - 1 === idx)
+        el.classList.toggle('activo', i === idx + 1)
       })
-
-      // Cargar audio de ese track
       audio.src = BASE + '/carpeta/audio?idx=' + idx
       audio.load()
-      // Reset player UI
+      resetPlayerUI()
+    }
+
+    function resetPlayerUI() {
       document.getElementById('progress-fill').style.width = '0%'
       document.getElementById('time-current').textContent  = '0:00'
       document.getElementById('icon-play').style.display   = 'block'
       document.getElementById('icon-pause').style.display  = 'none'
     }
 
-    // S42: descarga
+    function recargarBandeja() {
+      api('/carpeta/nombre').then(function(res) {
+        if (res.nombre) {
+          nombreTrackReal = res.nombre
+          trackActualIdx  = -1
+          document.getElementById('filename').textContent = res.nombre
+          audio.src = BASE + '/carpeta/audio?t=' + Date.now()
+          audio.load()
+          document.getElementById('time-total').textContent = '0:00'
+          resetPlayerUI()
+          cargarBandeja()
+        }
+      })
+    }
+
+    // ── DESCARGA ──
     function descargar() {
       var url     = document.getElementById('url-input').value.trim()
       var carpeta = getCarpetaSeleccionada()
       if (!url) return
-
       var btnDl   = document.getElementById('btn-download')
       var btnConf = document.getElementById('btn-confirmar')
       var status  = document.getElementById('download-status')
       var bar     = document.getElementById('download-progress-bar')
       var fill    = document.getElementById('download-progress-fill')
-
-      btnDl.disabled       = true
-      btnConf.disabled     = true
-      status.style.display = 'block'
-      status.className     = 'download-status'
-      status.textContent   = 'Iniciando descarga...'
-      bar.style.display    = 'block'
-      fill.style.width     = '0%'
-
+      btnDl.disabled = true; btnConf.disabled = true
+      status.style.display = 'block'; status.className = 'download-status'
+      status.textContent = 'Iniciando descarga...'
+      bar.style.display = 'block'; fill.style.width = '0%'
       api('/carpeta/descargar', 'POST', { url: url, carpeta: carpeta, formato: formato })
         .then(function() { pollDescarga() })
         .catch(function() {
-          status.className   = 'download-status error'
+          status.className = 'download-status error'
           status.textContent = 'Error al iniciar descarga'
-          btnDl.disabled     = false
-          btnConf.disabled   = false
+          btnDl.disabled = false; btnConf.disabled = false
         })
     }
 
@@ -473,26 +693,20 @@
       var fill    = document.getElementById('download-progress-fill')
       var btnDl   = document.getElementById('btn-download')
       var btnConf = document.getElementById('btn-confirmar')
-
       api('/carpeta/progreso_descarga').then(function(res) {
         if (res.items && res.items.length > 0) {
           var ultimo = res.items[res.items.length - 1]
-          fill.style.width   = ultimo.pct + '%'
+          fill.style.width = ultimo.pct + '%'
           status.textContent = ultimo.texto
         }
         if (res.error) {
-          status.className   = 'download-status error'
-          status.textContent = res.error
-          btnDl.disabled     = false
-          btnConf.disabled   = false
-          return
+          status.className = 'download-status error'; status.textContent = res.error
+          btnDl.disabled = false; btnConf.disabled = false; return
         }
         if (res.completado) {
-          status.className   = 'download-status ok'
-          status.textContent = '✓ Descarga completada'
-          fill.style.width   = '100%'
-          setTimeout(function() { api('/carpeta/cancelar', 'POST', {}) }, 1200)
-          return
+          status.className = 'download-status ok'; status.textContent = '✓ Descarga completada'
+          fill.style.width = '100%'
+          setTimeout(function() { api('/carpeta/cancelar', 'POST', {}) }, 1200); return
         }
         pollDescarga()
       }).catch(function() {})
@@ -507,7 +721,6 @@
     function togglePlay() {
       if (audio.paused) { audio.play() } else { audio.pause() }
     }
-
     audio.addEventListener('play', function() {
       document.getElementById('icon-play').style.display  = 'none'
       document.getElementById('icon-pause').style.display = 'block'
@@ -532,58 +745,30 @@
     }
     function detenerAudio() { audio.pause(); audio.currentTime = 0 }
 
-    // Llamado por Python via runJavaScript cuando llega un nuevo track a la bandeja
-    function recargarBandeja() {
-      cargarBandeja()
-      // Actualizar header con el nuevo track actual
-      api('/carpeta/nombre').then(function(res) {
-        if (res.nombre) {
-          document.getElementById('filename').textContent = res.nombre
-          trackActualIdx = -1
-          // B07: forzar reload del audio aunque la URL base sea la misma
-          audio.src = BASE + '/carpeta/audio?t=' + Date.now()
-          audio.load()
-          // Limpiar selección activa en bandeja
-          document.querySelectorAll('.bandeja-item').forEach(function(el) {
-            el.classList.remove('activo')
-          })
-          // Reset player UI
-          document.getElementById('progress-fill').style.width = '0%'
-          document.getElementById('time-current').textContent  = '0:00'
-          document.getElementById('time-total').textContent    = '0:00'
-          document.getElementById('icon-play').style.display   = 'block'
-          document.getElementById('icon-pause').style.display  = 'none'
-        }
-      })
-    }
-
     // ── INIT ──
     window.addEventListener('DOMContentLoaded', function() {
       api('/carpeta/modo').then(function(res) {
         modo = res.modo
-
         if (modo === 'manual') {
-          document.getElementById('header-label').textContent     = 'Descargar track'
-          document.getElementById('filename').textContent         = 'Pega una URL y elegí la carpeta'
-          document.getElementById('url-input').disabled           = false
-          document.getElementById('player-section').style.display = 'none'
-          document.getElementById('formato-bar').style.display    = 'flex'
-          document.getElementById('btn-confirmar').style.display  = 'none'
+          document.getElementById('header-label').textContent      = 'Descargar track'
+          document.getElementById('filename').textContent          = 'Pega una URL y elegí la carpeta'
+          document.getElementById('url-input').disabled            = false
+          document.getElementById('player-section').style.display  = 'none'
+          document.getElementById('formato-bar').style.display     = 'flex'
+          document.getElementById('btn-confirmar').style.display   = 'none'
+          document.getElementById('track-info-bar').style.display  = 'none'
+          document.getElementById('track-format').textContent      = 'MP3'
         } else {
-          // Modo auto
-          document.getElementById('url-input').disabled          = true
-          document.getElementById('url-input').placeholder       = 'Disponible desde el menú del tray'
-          document.getElementById('btn-download').style.display  = 'none'
-          document.getElementById('formato-bar').style.display   = 'none'
-
+          document.getElementById('url-input').disabled           = true
+          document.getElementById('url-input').placeholder        = 'Disponible desde el menú del tray'
+          document.getElementById('btn-download').style.display   = 'none'
+          document.getElementById('formato-bar').style.display    = 'none'
           audio.src = BASE + '/carpeta/audio?t=' + Date.now()
           audio.load()
-
           api('/carpeta/nombre').then(function(r) {
-            document.getElementById('filename').textContent = r.nombre || ''
+            nombreTrackReal = r.nombre || ''
+            document.getElementById('filename').textContent = nombreTrackReal
           })
-
-          // S50: cargar bandeja inicial + polling cada 2s para actualizaciones en tiempo real (B11)
           cargarBandeja()
           setInterval(cargarBandeja, 2000)
         }
@@ -601,10 +786,7 @@
             li.classList.add('selected')
           })
           li.addEventListener('dblclick', function() {
-            if (modo === 'auto') {
-              detenerAudio()
-              api('/carpeta/confirmar', 'POST', { carpeta: li.textContent.trim(), idx: trackActualIdx })
-            }
+            if (modo === 'auto') { detenerAudio(); confirmar() }
           })
           lista.appendChild(li)
         })
@@ -633,17 +815,24 @@
     })
 
     function confirmar() {
-      if (modo === 'manual') {
-        descargar()
-        return
-      }
+      if (modo === 'manual') { descargar(); return }
       detenerAudio()
-      var sel = document.querySelector('.folder-item.selected')
-      var carpeta = sel ? sel.textContent.trim() : ''
-      // S52: confirmar con idx del track seleccionado
-      api('/carpeta/confirmar', 'POST', { carpeta: carpeta, idx: trackActualIdx })
+      var carpeta       = getCarpetaSeleccionada()
+      var idxConfirmado = trackActualIdx
+      api('/carpeta/confirmar', 'POST', { carpeta: carpeta, idx: idxConfirmado })
         .then(function() {
-          // Recargar bandeja después de confirmar
+          if (idxConfirmado !== -1) {
+            api('/carpeta/nombre').then(function(r) {
+              if (r.nombre) {
+                nombreTrackReal = r.nombre
+                document.getElementById('filename').textContent = r.nombre
+                trackActualIdx = -1
+                audio.src = BASE + '/carpeta/audio?t=' + Date.now()
+                audio.load()
+                resetPlayerUI()
+              }
+            })
+          }
           setTimeout(function() { cargarBandeja() }, 300)
         })
     }
