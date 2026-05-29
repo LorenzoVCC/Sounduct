@@ -570,10 +570,11 @@
         var trackIdx   = document.getElementById('track-index')
 
         // B03: contador x/x
-        var total = res.total || 1
-        if (total > 1) {
-          label.textContent    = 'Track ' + (res.posicion || 1) + ' de ' + total
-          trackIdx.textContent = (res.posicion || 1) + '/' + total
+        var total   = res.total    || 1
+        var posicion = res.posicion || 1
+        if (total > 1 || posicion > 1) {
+          label.textContent    = 'Track ' + posicion + ' de ' + total
+          trackIdx.textContent = posicion + '/' + total
         } else {
           label.textContent    = 'Nuevo track detectado'
           trackIdx.textContent = ''

@@ -1076,6 +1076,8 @@ def procesar_archivo_nuevo(path):
         print(f"[BANDEJA] Encolando: {nombre}")
         with _bandeja_lock:
             _bandeja.append({"nombre": nombre, "path": path, "callback": callback})
+        # B03: actualizar total en tiempo real para que el contador sea correcto
+        _estado["carpeta"]["total"] = _estado["carpeta"]["posicion"] + len(_bandeja)
         actualizar_tray_bandeja()
         done.wait()
         return
