@@ -531,6 +531,8 @@
     var formato = 'mp3'
     var trackActualIdx  = -1
     var nombreTrackReal = ''
+    var posicionActual  = 1
+    var totalTracks     = 1
 
     function api(endpoint, method, body) {
       return fetch(BASE + endpoint, {
@@ -570,24 +572,31 @@
         var trackIdx   = document.getElementById('track-index')
 
         // B03: contador x/x
-        var total   = res.total    || 1
+        var total    = res.total    || 1
         var posicion = res.posicion || 1
-        if (total > 1 || posicion > 1) {
-          label.textContent    = 'Track ' + posicion + ' de ' + total
-          trackIdx.textContent = posicion + '/' + total
-        } else {
-          label.textContent    = 'Nuevo track detectado'
-          trackIdx.textContent = ''
+        posicionActual = posicion
+        totalTracks    = total
+        if (trackActualIdx < 0) {
+          if (total > 1 || posicion > 1) {
+            label.textContent    = 'Track ' + posicion + ' de ' + total
+            trackIdx.textContent = posicion + '/' + total
+          } else {
+            label.textContent    = 'Nuevo track detectado'
+            trackIdx.textContent = ''
+          }
         }
 
         // Reconstruir lista
         lista.innerHTML = ''
 
-        // Track activo siempre primero
+        // posicionActual es el número del track activo en orden de llegada
+        var numActivo = posicionActual
+
+        // Track activo — muestra su número, flecha si está en el player (trackActualIdx === -1)
         var itemActivo = document.createElement('div')
-        itemActivo.className = 'bandeja-item activo'
+        itemActivo.className = 'bandeja-item' + (trackActualIdx === -1 ? ' activo' : '')
         itemActivo.id        = 'bandeja-item-activo'
-        itemActivo.innerHTML = '<span class="track-num">▶</span>' +
+        itemActivo.innerHTML = '<span class="track-num">' + (trackActualIdx === -1 ? '▶' : numActivo) + '</span>' +
                                '<span class="track-nombre">' + nombreTrackReal + '</span>'
         itemActivo.addEventListener('click', function() {
           trackActualIdx = -1
@@ -595,9 +604,20 @@
           document.getElementById('filename').textContent = nombreTrackReal
           document.querySelectorAll('.bandeja-item').forEach(function(el) { el.classList.remove('activo') })
           itemActivo.classList.add('activo')
+          itemActivo.querySelector('.track-num').textContent = '▶'
           audio.src = BASE + '/carpeta/audio?t=' + Date.now()
           audio.load()
           resetPlayerUI()
+          // S49: restaurar contador a posición real
+          var label    = document.getElementById('header-label')
+          var trackIdx = document.getElementById('track-index')
+          if (totalTracks > 1 || posicionActual > 1) {
+            label.textContent    = 'Track ' + posicionActual + ' de ' + totalTracks
+            trackIdx.textContent = posicionActual + '/' + totalTracks
+          } else {
+            label.textContent    = 'Nuevo track detectado'
+            trackIdx.textContent = ''
+          }
         })
         lista.appendChild(itemActivo)
 
@@ -611,37 +631,53 @@
         } else {
           count.textContent = pendientes.length
           pendientes.forEach(function(t) {
+            var numPendiente = numActivo + t.idx + 1
             var item = document.createElement('div')
             item.className = 'bandeja-item'
-            item.innerHTML = '<span class="track-num">' + (t.idx + 1) + '</span>' +
+            item.innerHTML = '<span class="track-num">' + numPendiente + '</span>' +
                              '<span class="track-nombre">' + t.nombre + '</span>'
-            item.addEventListener('click', function() { seleccionarDeBandeja(t.idx, t.nombre) })
+            item.addEventListener('click', function() { seleccionarDeBandeja(t.idx, t.nombre, numPendiente) })
             lista.appendChild(item)
           })
         }
 
-        // Restaurar selección si hay un track de cola seleccionado
+        // Restaurar flecha en el seleccionado si hay un track de cola seleccionado
         if (trackActualIdx >= 0) {
           var items = lista.querySelectorAll('.bandeja-item')
-          // items[0] = activo, items[trackActualIdx+1] = el seleccionado
+          itemActivo.querySelector('.track-num').textContent = numActivo
           if (items[trackActualIdx + 1]) {
-            items[0].classList.remove('activo')
             items[trackActualIdx + 1].classList.add('activo')
+            items[trackActualIdx + 1].querySelector('.track-num').textContent = '▶'
           }
         }
       })
     }
 
-    function seleccionarDeBandeja(idx, nombre) {
+    function seleccionarDeBandeja(idx, nombre, numVisual) {
       trackActualIdx = idx
       detenerAudio()
       document.getElementById('filename').textContent = nombre
-      document.querySelectorAll('.bandeja-item').forEach(function(el, i) {
-        el.classList.toggle('activo', i === idx + 1)
+      // Restaurar números en todos, poner flecha solo en el seleccionado
+      var items = document.querySelectorAll('.bandeja-item')
+      items.forEach(function(el, i) {
+        el.classList.remove('activo')
+        if (i === 0) el.querySelector('.track-num').textContent = posicionActual
       })
+      var seleccionado = items[idx + 1]
+      if (seleccionado) {
+        seleccionado.classList.add('activo')
+        seleccionado.querySelector('.track-num').textContent = '▶'
+      }
       audio.src = BASE + '/carpeta/audio?idx=' + idx
       audio.load()
       resetPlayerUI()
+      // S49: mostrar posición del track seleccionado en el header
+      var label    = document.getElementById('header-label')
+      var trackIdx = document.getElementById('track-index')
+      if (totalTracks > 1 || numVisual > 1) {
+        label.textContent    = 'Track ' + numVisual + ' de ' + totalTracks
+        trackIdx.textContent = numVisual + '/' + totalTracks
+      }
     }
 
     function resetPlayerUI() {
